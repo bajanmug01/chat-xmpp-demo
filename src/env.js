@@ -17,6 +17,7 @@ export const env = createEnv({
    */
   client: {
     // NEXT_PUBLIC_CLIENTVAR: z.string(),
+    // TODO: for prod domain and service in environment variables
     NEXT_PUBLIC_XMPP_SERVICE: z.string().default("xmpp://localhost:5222"),
     NEXT_PUBLIC_XMPP_DOMAIN: z.string().default("localhost"),
   },
