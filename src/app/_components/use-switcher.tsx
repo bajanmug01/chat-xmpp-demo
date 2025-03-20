@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { UserSession } from "../lib/types";
+import { type UserSession } from "../lib/types";
 import {
   Tooltip,
   TooltipContent,

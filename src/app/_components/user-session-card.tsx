@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
-import { Contact, User, UserSession } from "../lib/types"
+import { type Contact, type User, type UserSession } from "../lib/types"
 import { Card, CardContent, CardHeader } from "LA/components/ui/card"
 import { Button } from "LA/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "LA/components/ui/tabs"
@@ -66,7 +66,7 @@ export function UserSessionCard({
           </div>
         </CardHeader>
         <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
-          <Tabs defaultValue="contacts" className="flex flex-col h-full">
+          <Tabs defaultValue="contacts" value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
             <TabsList className="grid grid-cols-2 mx-3 mb-2">
               <TabsTrigger value="contacts" onClick={() => setActiveTab("contacts")}>
                 Contacts

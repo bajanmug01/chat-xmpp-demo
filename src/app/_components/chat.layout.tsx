@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Contact, UserSession } from "../lib/types";
+import { type Contact, type UserSession } from "../lib/types";
 import { ContactList } from "./contact-list";
 import { ChatInterface } from "./chat-interface";
 

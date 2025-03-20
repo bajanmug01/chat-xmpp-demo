@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "LA/components/ui/dialog"
-import { Contact } from "../lib/types"
+import { type Contact } from "../lib/types"
 import { Label } from "LA/components/ui/label"
 import { Button } from "LA/components/ui/button"
 import { Input } from "LA/components/ui/input"

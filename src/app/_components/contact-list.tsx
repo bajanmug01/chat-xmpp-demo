@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Search, Plus, LogOut } from "lucide-react"
-import { Contact, User } from "../lib/types"
+import { type Contact, type User } from "../lib/types"
 import { Button } from "LA/components/ui/button"
 import { Switch } from "LA/components/ui/switch"
 import { Label } from "LA/components/ui/label"
@@ -132,10 +133,12 @@ export function ContactList({
                 onClick={() => onSelectContact(contact)}
               >
                 <div className="relative">
-                  <img
+                  <Image
                     src={contact.avatar || "/placeholder.svg"}
                     alt={contact.name}
-                    className={`${compact ? "h-8 w-8" : "h-10 w-10"} rounded-full`}
+                    width={compact ? 32 : 40}
+                    height={compact ? 32 : 40}
+                    className="rounded-full"
                   />
                   <div
                     className={`absolute bottom-0 right-0 ${compact ? "h-2 w-2" : "h-3 w-3"} rounded-full border-2 border-white ${

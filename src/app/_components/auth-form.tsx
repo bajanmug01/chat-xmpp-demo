@@ -3,7 +3,7 @@
 import type React from "react";
 
 import { useState } from "react";
-import { User } from "../lib/types";
+import { type User } from "../lib/types";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";

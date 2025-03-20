@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PlusCircle } from "lucide-react";
-import { Contact, Message, User, UserSession } from "./lib/types";
+import { type Contact, type Message, type User, type UserSession } from "./lib/types";
 import { Button } from "LA/components/ui/button";
 import { UserSessionCard } from "./_components/user-session-card";
 

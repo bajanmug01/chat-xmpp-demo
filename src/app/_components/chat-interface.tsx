@@ -1,10 +1,11 @@
 "use client";
 
 import type React from "react";
+import Image from "next/image";
 
 import { useState, useRef, useEffect } from "react";
 import { Send, ArrowLeft, X } from "lucide-react";
-import { Contact, Message, User } from "../lib/types";
+import { type Contact, type Message, type User } from "../lib/types";
 import { Button } from "LA/components/ui/button";
 import { Input } from "LA/components/ui/input";
 
@@ -63,10 +64,12 @@ export function ChatInterface({
             )}
             <div className="flex items-center space-x-3">
               <div className="relative">
-                <img
+                <Image
                   src={contact.avatar || "/placeholder.svg"}
                   alt={contact.name}
-                  className="h-10 w-10 rounded-full"
+                  width={40}
+                  height={40}
+                  className="rounded-full"
                 />
                 <div
                   className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
@@ -97,10 +100,12 @@ export function ChatInterface({
         <div className="flex items-center justify-between border-b border-gray-200 p-2">
           <div className="flex items-center space-x-2">
             <div className="relative">
-              <img
+              <Image
                 src={contact.avatar || "/placeholder.svg"}
                 alt={contact.name}
-                className="h-6 w-6 rounded-full"
+                width={24}
+                height={24}
+                className="rounded-full"
               />
               <div
                 className={`absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-white ${
