@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  prosody:
+    image: prosody/prosody:latest
+    container_name: prosody-xmpp
+    ports:
+      - "5222:5222" # XMPP client connections
+      - "5269:5269" # XMPP server-to-server
+      - "5280:5280" # HTTP for BOSH/WebSocket
+      - "5281:5281" # HTTPS for BOSH/WebSocket
+    volumes:
+      - ./prosody-config:/etc/prosody
+    restart: unless-stopped
+    environment:
+      - PROSODY_DOCKER_NOUSER=true
