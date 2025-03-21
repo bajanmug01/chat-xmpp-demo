@@ -1,7 +1,5 @@
-import { client, xml } from '@xmpp/client';
+import { client } from '@xmpp/client';
 import { env } from "LA/env";
-import { exec } from 'child_process';
-import { promisify } from 'util';
 
 // Define types
 interface UserRegistrationData {
@@ -10,7 +8,7 @@ interface UserRegistrationData {
 }
 
 /**
- * Creates a user on the XMPP server
+ * Creates a user on the XMPP server via WebSocket using in-band registration
  */
 export async function createUser({
   newUser,
@@ -342,159 +340,3 @@ export async function createUser({
     };
   });
 }
-
-/**
- * Creates a user on the XMPP server using in-band registration with data forms
- * For servers that require data forms for registration
- */
-export async function createUserWithDataForm({
-  newUser,   
-  newPass  
-}: UserRegistrationData): Promise<void> {
-  // Get environment variables
-    const service = env.NEXT_PUBLIC_XMPP_SERVICE;
-    const domain = env.NEXT_PUBLIC_XMPP_DOMAIN;
-
-  if (!service || !domain) {
-    throw new Error("Missing required environment variables");
-  }
-
-  // Create XMPP client WITHOUT authentication
-  const xmpp = client({
-    service,
-    domain,
-    // Leave username and password undefined to enable anonymous connection
-  });
-
-  let registrationComplete = false;
-
-  try {
-    // Set up error handler
-    xmpp.on('error', (err: Error) => {
-    console.error('❌ Error:', err.toString());
-  });
-
-    // Set up online handler - this will fire when connected but not authenticated
-    // Using void to explicitly handle the Promise and avoid linter errors
-    xmpp.on('online', () => {
-      void (async () => {
-        console.log('Connected anonymously to XMPP server, attempting registration with data form...');
-        
-        try {
-          // 1. First, query registration requirements from server
-          const registrationForm = await xmpp.iqCaller.get(
-            xml('query', { xmlns: 'jabber:iq:register' })
-          );
-          console.log('Registration form received:', registrationForm.toString());
-          
-          // 2. Send data form for registration
-          const result = await xmpp.iqCaller.set(
-            xml('query', { xmlns: 'jabber:iq:register' },
-              xml('x', { xmlns: 'jabber:x:data', type: 'submit' },
-                xml('field', { var: 'FORM_TYPE', type: 'hidden' },
-                  xml('value', {}, 'jabber:iq:register')
-                ),
-                xml('field', { var: 'username' },
-                  xml('value', {}, newUser)
-                ),
-                xml('field', { var: 'password' },
-                  xml('value', {}, newPass)
-                )
-              )
-            )
-          );
-          
-          console.log('✅ User registration successful!', result.toString());
-          registrationComplete = true;
-        } catch (err: unknown) {
-          console.error('❌ Registration failed:', err instanceof Error ? err.message : String(err));
-          throw err; // Re-throw to be caught by outer try/catch
-    } finally {
-          // Disconnect after registration attempt
-          try {
-      await xmpp.stop();
-          } catch (err: unknown) {
-            console.log('Error during disconnect:', err instanceof Error ? err.message : String(err));
-          }
-    }
-      })();
-  });
-
-    // Start connection
-  await xmpp.start();
-    
-    // Wait for registration to complete or fail
-    // We need this timeout because xmpp.js might not properly trigger all events
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        if (!registrationComplete) {
-          console.log('Registration timed out, disconnecting...');
-          xmpp.stop().catch((err: Error) => console.error('Error stopping client:', err.message));
-          reject(new Error('Registration timed out'));
-        } else {
-          resolve();
-        }
-      }, 10000); // 10 second timeout
-      
-      xmpp.on('close', () => {
-        clearTimeout(timeout);
-        if (registrationComplete) {
-          resolve();
-        } else {
-          reject(new Error('Connection closed before registration completed'));
-        }
-      });
-    });
-  } catch (error: unknown) {
-    console.error('XMPP connection error:', error instanceof Error ? error.message : String(error));
-    throw new Error('Could not connect to XMPP server');
-  }
-}
-
-/**
- * Creates a user on the XMPP server using prosodyctl in the Docker container
- * This bypasses all XMPP protocols and directly uses the server's CLI tool
- */
-export async function createUserWithProsodyctl({
-  newUser,
-  newPass
-}: UserRegistrationData): Promise<void> {
-  // Get environment variables
-  const domain = env.NEXT_PUBLIC_XMPP_DOMAIN;
-
-  if (!domain) {
-    throw new Error("NEXT_PUBLIC_XMPP_DOMAIN environment variable is not set");
-  }
-
-  const execPromise = promisify(exec);
-  console.log(`Attempting to register user ${newUser}@${domain} using prosodyctl in Docker...`);
-  
-  try {
-    // Direct command execution using docker exec
-    const dockerCommand = `docker exec prosody-xmpp prosodyctl register ${newUser} ${domain} ${newPass}`;
-    
-    console.log('Executing prosodyctl command in Docker container...');
-    const { stdout, stderr } = await execPromise(dockerCommand);
-    
-    if (stderr?.trim()) {
-      console.error('prosodyctl error:', stderr);
-      throw new Error('Failed to register user with prosodyctl');
-    }
-    
-    console.log('prosodyctl output:', stdout);
-    console.log(`✅ User ${newUser}@${domain} successfully registered!`);
-    
-    // Try to verify registration by listing users
-    try {
-      const listCommand = `docker exec prosody-xmpp prosodyctl userlist`;
-      const { stdout: listStdout } = await execPromise(listCommand);
-      console.log('Current users:', listStdout);
-    } catch (listError) {
-      console.log('Could not list users:', listError instanceof Error ? listError.message : String(listError));
-    }
-  } catch (error: unknown) {
-    console.error('Registration error:', error instanceof Error ? error.message : String(error));
-    throw new Error('Could not register XMPP user');
-  }
-}
-
