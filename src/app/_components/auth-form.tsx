@@ -27,7 +27,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   
-  // Use the standard registration method
+  // Register user on xmpp server (very simple approach not validating and not restricting spam)
   const registerUser = api.xmpp.registerUser.useMutation();
 
   // Add event listener for XMPP client errors
@@ -135,7 +135,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
         <Button type="submit" className="w-full">
-          Sign In
+          Sign Up
         </Button>
       </div>
     </form>
