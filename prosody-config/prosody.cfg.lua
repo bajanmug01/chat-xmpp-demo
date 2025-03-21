@@ -45,8 +45,9 @@ https_ssl = {
 -- Set up your domain
 VirtualHost "localhost"
     authentication = "internal_plain"
-    --authentication = "anonymous"
-    modules_enabled = { "register_ibr" }
+    -- Allow registration over unencrypted connections (only needed for development)
+    allow_unencrypted_plain_auth = true
+    
     ssl = {
         key = "/etc/prosody/certs/localhost.key";
         certificate = "/etc/prosody/certs/localhost.crt";

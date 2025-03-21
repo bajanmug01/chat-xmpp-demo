@@ -1,23 +1,18 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc"; 
-import { connectAsAdmin, createUser } from "LA/server/xmppAdmin";
+import { createTRPCRouter, publicProcedure } from "LA/server/api/trpc";
+import { createUser } from "LA/server/xmppAdmin";
 
 export const xmppRouter = createTRPCRouter({
   registerUser: publicProcedure
-    .input(
-      z.object({
-        jid: z.string(),
-        password: z.string().min(1),
-      })
-    )
+    .input(z.object({
+      username: z.string().min(3),
+      password: z.string().min(6),
+    }))
     .mutation(async ({ input }) => {
-
-      const adminClient = await connectAsAdmin();
-
-      await createUser(adminClient, input.jid, input.password);
-
-      await adminClient.stop();
-
+      await createUser({
+        newUser: input.username,
+        newPass: input.password,
+      });
       return { success: true };
     }),
 });

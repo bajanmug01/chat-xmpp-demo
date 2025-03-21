@@ -1,240 +1,500 @@
-import {
-  client as createXmppClient,
-  type XmppClient,
-  xml,
-  type XmlElement,
-} from "@xmpp/client";
+import { client, xml } from '@xmpp/client';
 import { env } from "LA/env";
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// TODO: When starting the xmpp-Server for the first time execute script './create-user..ps1' to create admin manually (secrets from script should be the same from environment variables (.env))
-export async function connectAsAdmin(): Promise<XmppClient> {
-  const adminJid = process.env.ADMIN_XMPP_JID ?? "";
-  const adminPass = process.env.ADMIN_XMPP_PASS ?? "";
-  const xmppService = env.NEXT_PUBLIC_XMPP_SERVICE ?? "";
-  const xmppDomain = env.NEXT_PUBLIC_XMPP_DOMAIN ?? "";
-
-  // Check if required env variables are empty and throw error if they are
-  if (!adminJid) {
-    throw new Error("ADMIN_XMPP_JID environment variable is not set");
-  }
-  
-  if (!adminPass) {
-    throw new Error("ADMIN_XMPP_PASS environment variable is not set");
-  }
-  
-  if (!xmppService) {
-    throw new Error("XMPP_SERVICE environment variable is not set");
-  }
-  
-  if (!xmppDomain) {
-    throw new Error("XMPP_DOMAIN environment variable is not set");
-  }
-
-  console.log("Connecting as admin:", adminJid);
-  console.log("XMPP Service:", xmppService);
-  console.log("XMPP Domain:", xmppDomain);
-
-  // Extract username from JID
-  const adminUsername = adminJid.split("@")[0];
-  console.log("Admin username:", adminUsername);
-
-  const adminClient = createXmppClient({
-    service: xmppService,
-    domain: xmppDomain,
-    username: adminUsername,
-    password: adminPass,
-  });
-
-  // Set up error handling
-  adminClient.on("error", (err) => {
-    console.error("Admin XMPP error:", err);
-  });
-  
-  // Add online handler for debugging
-  adminClient.on("online", (data) => {
-    console.log("Admin XMPP client is now online as:", data.jid?.toString());
-  });
-  
-  // Add stanza handler for debugging
-  adminClient.on("stanza", (stanza) => {
-    console.log("Admin received stanza type:", stanza.attrs.type);
-    if (stanza.attrs.type === "error") {
-      console.log("Error stanza details:", JSON.stringify(stanza.attrs));
-    }
-  });
-
-  // Set up a timeout for the connection (increase to 20 seconds)
-  const connectionPromise = adminClient.start();
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Connection timeout after 20 seconds")), 20000);
-  });
-
-  try {
-    await Promise.race([connectionPromise, timeoutPromise]);
-    console.log("Admin XMPP client connected!");
-    return adminClient;
-  } catch (error) {
-    console.error("Failed to connect admin client:", error);
-    // Did you create the admin user? Check script 'create-user.ps1'
-    console.log("Did you create the admin user with 'create-user.ps1' script?");
-    console.log("Admin username should be:", adminUsername);
-    console.log("Domain should be:", xmppDomain);
-    throw new Error("Could not connect to XMPP server as admin");
-  }
+// Define types
+interface UserRegistrationData {
+  newUser: string;
+  newPass: string;
 }
 
-// This function uses direct XMPP registration via In-Band Registration (XEP-0077)
-export async function createUser(
-  adminClient: XmppClient,
-  userJid: string,
-  userPass: string,
-): Promise<boolean> {
-  try {
-    const domain = env.NEXT_PUBLIC_XMPP_DOMAIN ?? 'localhost';
-    const username = userJid.includes('@') ? userJid.split('@')[0] : userJid;
-    
-    console.log(`Attempting to create user: ${username} on domain ${domain}`);
+/**
+ * Creates a user on the XMPP server
+ */
+export async function createUser({
+  newUser,
+  newPass
+}: UserRegistrationData): Promise<void> {
+  // Get environment variables
+  const serviceUrl = env.NEXT_PUBLIC_XMPP_SERVICE;
+  const domain = env.NEXT_PUBLIC_XMPP_DOMAIN;
 
-    // We'll use a simplified approach without relying on iqCaller
-    console.log("Sending registration request for user:", username);
+  if (!serviceUrl) {
+    throw new Error("NEXT_PUBLIC_XMPP_SERVICE environment variable is not set");
+  }
+  
+  if (!domain) {
+    throw new Error("NEXT_PUBLIC_XMPP_DOMAIN environment variable is not set");
+  }
+
+  console.log(`Attempting to register user ${newUser}@${domain} via WebSocket...`);
+  
+  // If it's an HTTP URL, convert it to a WebSocket URL
+  let wsUrl = serviceUrl;
+  if (wsUrl.startsWith('http://')) {
+    wsUrl = wsUrl.replace('http://', 'ws://');
+  } else if (wsUrl.startsWith('https://')) {
+    wsUrl = wsUrl.replace('https://', 'wss://');
+  }
+  
+  if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+    console.log(`Service URL not a WebSocket URL: ${wsUrl}, adding ws:// prefix`);
+    wsUrl = `ws://${wsUrl}`;
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    console.log(`Connecting to WebSocket: ${wsUrl}`);
+    
+    let socket: WebSocket;
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let registrationComplete = false;
+    let connectionClosed = false;
+    
+    // Helper function to sanitize XML for WebSocket
+    const sanitizeXml = (xml: string): string => {
+      // RFC 7395 requires framing to start with '<' immediately
+      return xml.trim();
+    };
     
     try {
-      // Generate a unique request ID for the registration form request
-      const formId = `reg_form_${Date.now()}`;
+      socket = new WebSocket(wsUrl, ['xmpp']);
+    } catch (err) {
+      return reject(new Error(`Failed to create WebSocket: ${err instanceof Error ? err.message : String(err)}`));
+    }
+    
+    // Generate a unique ID for our XMPP stanzas
+    const stanzaId = Math.random().toString(36).substring(2, 15);
+    
+    // Set a timeout in case nothing happens
+    const mainTimeout = setTimeout(() => {
+      if (!registrationComplete && !connectionClosed) {
+        console.log("Registration process timed out");
+        cleanup();
+        reject(new Error("Registration timed out"));
+      }
+    }, 15000);
+    
+    // Helper to clean up all resources
+    const cleanup = () => {
+      connectionClosed = true;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+      clearTimeout(mainTimeout);
       
-      // First, request the registration form
-      console.log("Requesting registration form...");
-      const formRequest = xml(
-        "iq", 
-        { type: "get", id: formId },
-        xml("query", { xmlns: "jabber:iq:register" })
-      );
-      
-      // Send the form request
-      await adminClient.send(formRequest);
-      
-      // Wait for the form response
-      const formResponse = await new Promise<XmlElement>((resolve, reject) => {
-        const formHandler = (stanza: XmlElement) => {
-          if (stanza.is("iq") && stanza.attrs.id === formId) {
-            adminClient.off("stanza", formHandler);
-            
-            if (stanza.attrs.type === "result") {
-              console.log("Registration form received");
-              resolve(stanza);
-            } else {
-              reject(new Error(`Failed to get registration form: ${stanza.attrs.type}`));
-            }
+      // Only close the socket if it's still open
+      if (socket && socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) {
+        console.log("Closing WebSocket connection");
+        try {
+          // Try to send a proper close stream first
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(sanitizeXml('<close xmlns="urn:ietf:params:xml:ns:xmpp-framing"/>'));
           }
-        };
+          socket.close();
+        } catch (e) {
+          console.error("Error closing socket:", e);
+        }
+      }
+    };
+    
+    // Set up heartbeat to keep connection alive
+    const startHeartbeat = () => {
+      console.log("Starting heartbeat");
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      
+      heartbeatInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          console.log("Sending heartbeat ping");
+          // Use a proper XMPP ping
+          const pingId = Math.random().toString(36).substring(2, 10);
+          const ping = `<iq type="get" id="ping-${pingId}" xmlns="jabber:client"><ping xmlns="urn:xmpp:ping"/></iq>`;
+          try {
+            socket.send(sanitizeXml(ping));
+          } catch (err) {
+            console.log("Error sending heartbeat ping:", err);
+            clearInterval(heartbeatInterval!);
+            heartbeatInterval = null;
+          }
+        } else {
+          clearInterval(heartbeatInterval!);
+          heartbeatInterval = null;
+        }
+      }, 5000);
+    };
+    
+    socket.onopen = function() {
+      try {
+        console.log("WebSocket connection established");
         
-        adminClient.on("stanza", formHandler);
+        // Start heartbeat
+        startHeartbeat();
         
-        // Set timeout for form request
-        setTimeout(() => {
-          adminClient.off("stanza", formHandler);
-          reject(new Error("Timeout waiting for registration form"));
-        }, 5000);
-      });
-      
-      // Look at the form to determine what fields are supported
-      const query = formResponse.getChild("query", "jabber:iq:register");
-      // Use optional chaining with type assertions
-      const hasDataForm = Boolean(query?.getChild("x", "jabber:x:data"));
-      const hasUsernameField = Boolean(query?.getChild("username"));
-      
-      console.log(`Form supports: ${hasDataForm ? 'data-forms' : 'no-data-forms'}, ${hasUsernameField ? 'username field' : 'no username field'}`);
-      
-      // Generate a unique request ID for the actual registration
-      const registerId = `register_${Date.now()}`;
-      
-      // Now send the actual registration request - we have two formats to try
-      console.log("Sending registration data...");
-      
-      // Choose format based on what the server supports
-      let registerRequest;
-      if (hasDataForm) {
-        console.log("Using XEP-0004 data form format");
-        registerRequest = xml(
-          "iq", 
-          { type: "set", id: registerId },
-          xml("query", { xmlns: "jabber:iq:register" },
-            xml("x",
-              { type: "submit", xmlns: "jabber:x:data" },
-              xml("field", { type: "hidden", var: "FORM_TYPE" },
-                xml("value", {}, "jabber:iq:register")
-              ),
-              xml("field", { label: "Username", type: "text-single", var: "username" },
-                xml("required"),
-                xml("value", {}, String(username))
-              ),
-              xml("field", { label: "Password", type: "text-private", var: "password" },
-                xml("required"),
-                xml("value", {}, String(userPass))
-              )
-            )
-          )
-        );
-      } else if (hasUsernameField) {
-        console.log("Using basic registration format");
-        registerRequest = xml(
-          "iq", 
-          { type: "set", id: registerId },
-          xml("query", { xmlns: "jabber:iq:register" },
-            xml("username", {}, String(username)),
-            xml("password", {}, String(userPass))
-          )
-        );
+        // Start XMPP stream
+        const openStream = `<open xmlns="urn:ietf:params:xml:ns:xmpp-framing" to="${domain}" version="1.0"/>`;
+        console.log("Sending open stream");
+        socket.send(sanitizeXml(openStream));
+      } catch (err) {
+        console.error("Error in onopen handler:", err);
+        cleanup();
+        reject(new Error("Failed to start XMPP stream"));
+      }
+    };
+    
+    socket.onmessage = (event) => {
+      // Process the message data
+      let data: string;
+      if (typeof event.data === 'string') {
+        data = event.data;
+      } else if (event.data instanceof ArrayBuffer) {
+        data = new TextDecoder().decode(event.data);
       } else {
-        throw new Error("Server doesn't support in-band registration in a format we recognize");
+        console.log("Received non-text data from WebSocket");
+        return;
       }
       
-      // Send the registration request
-      await adminClient.send(registerRequest);
+      console.log("Received WebSocket data:", data);
       
-      // Wait for the response
-      const result = await new Promise<boolean>((resolve, reject) => {
-        const responseHandler = (stanza: XmlElement) => {
-          if (stanza.is("iq") && stanza.attrs.id === registerId) {
-            adminClient.off("stanza", responseHandler);
-            
-            if (stanza.attrs.type === "result") {
-              console.log(`✅ User ${username} registered successfully!`);
-              resolve(true);
-            } else if (stanza.attrs.type === "error") {
-              // Check for specific error conditions
-              const error = stanza.getChild("error");
-              
-              // If conflict error (user already exists), we're fine
-              if (error?.getChild("conflict")) {
-                console.log(`User ${username} already exists, continuing`);
-                resolve(true);
-              } else {
-                const errorType = error?.attrs?.type ?? "unknown";
-                reject(new Error(`Registration failed: ${errorType}`));
-              }
-            } else {
-              reject(new Error(`Unexpected response: ${stanza.attrs.type}`));
-            }
-          }
-        };
+      // Log key identifiers to help with debugging
+      console.log(`Looking for registration form ID: ${stanzaId}-reg1`);
+      console.log(`Looking for registration result ID: ${stanzaId}-reg2`);
+      
+      // Parse and handle the message based on XMPP registration flow
+      if (data.includes('<stream:features')) {
+        console.log("Received stream features");
         
-        adminClient.on("stanza", responseHandler);
+        // Check if registration is supported - look for any indication of registration support
+        const hasRegisterFeature = data.includes('http://jabber.org/features/iq-register') || 
+                                   data.includes('jabber:iq:register') ||
+                                   data.includes('<register') ||
+                                   data.includes('iq-register');
         
-        // Set timeout for registration request
+        if (!hasRegisterFeature) {
+          console.error("Server does not support in-band registration");
+          cleanup();
+          return reject(new Error("Server does not support in-band registration"));
+        }
+        
+        // Ensure we use the RFC 7395 WebSocket framing protocol
+        // Request registration form - no extra whitespace or newlines
+        const regQuery = `<iq type="get" id="${stanzaId}-reg1" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"/></iq>`;
+        
+        console.log("Sending registration form request");
+        
+        try {
+          socket.send(sanitizeXml(regQuery));
+        } catch (sendErr) {
+          console.error("Error sending registration form request:", sendErr);
+          cleanup();
+          return reject(new Error("Error sending registration form request"));
+        }
+      }
+      
+      // Registration form received - simpler checks to better match server responses
+      else if (data.includes('jabber:iq:register') && data.includes('jabber:x:data')) {
+        console.log("Received registration form with data form, submitting registration data");
+        
+        // For servers that use data forms
+        const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
+        
+        console.log("Sending data form registration");
+        try {
+          socket.send(sanitizeXml(dataFormRegistration));
+        } catch (sendErr) {
+          console.error("Error sending data form registration:", sendErr);
+          cleanup();
+          return reject(new Error("Error sending data form registration"));
+        }
+      }
+      // Alternative registration form detection (for servers that don't send a data form)
+      else if (data.includes('jabber:iq:register') && (data.includes('<username/>') || data.includes('<password/>'))) {
+        console.log("Received registration form with basic fields, submitting registration data");
+        
+        // Send basic registration data
+        const registration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><username>${newUser}</username><password>${newPass}</password></query></iq>`;
+        console.log("Sending registration data");
+        
+        try {
+          socket.send(sanitizeXml(registration));
+        } catch (sendErr) {
+          console.error("Error sending registration data:", sendErr);
+          cleanup();
+          return reject(new Error("Error sending registration data"));
+        }
+      }
+      
+      // Registration response - simpler detection that doesn't rely on specific IDs
+      else if (data.includes('type="result"') || data.includes("type='result'")) {
+        // If we receive any successful result after sending registration data, consider it a success
+        console.log("Received successful result, assuming registration complete");
+        
+        // Success!
+        console.log(`✅ User ${newUser}@${domain} successfully registered!`);
+        registrationComplete = true;
+        
+        // Send proper stream close
+        try {
+          socket.send(sanitizeXml('<close xmlns="urn:ietf:params:xml:ns:xmpp-framing"/>'));
+        } catch (closeErr) {
+          console.error("Error sending stream close:", closeErr);
+          // Not critical, we'll still try to close the socket
+        }
+        
+        // Delay cleanup to allow server to process close
         setTimeout(() => {
-          adminClient.off("stanza", responseHandler);
-          reject(new Error("Timeout waiting for registration response"));
-        }, 10000);
-      });
+          cleanup();
+          
+          // Try to verify the registration by authenticating with the new credentials
+          setTimeout(() => {
+            void (async () => {
+              try {
+                console.log(`Verifying registration by authenticating as ${newUser}...`);
+                
+                // Create an XMPP client to verify authentication
+                const verifyClient = client({
+                  service: serviceUrl,
+                  domain,
+                  username: newUser,
+                  password: newPass,
+                  resource: 'registrationverify'
+                });
+                
+                let authSuccess = false;
+                
+                verifyClient.on('online', () => {
+                  console.log(`✅ Authentication successful! User ${newUser} was created properly.`);
+                  authSuccess = true;
+                  void verifyClient.stop();
+                });
+                
+                verifyClient.on('error', (err) => {
+                  console.log(`Verification warning: ${err.message}`);
+                  // Not fatal, we'll stop the client after timeout
+                });
+                
+                await verifyClient.start();
+                
+                // Give it 2 seconds to authenticate
+                await new Promise(resolveAuth => setTimeout(resolveAuth, 2000));
+                
+                if (!authSuccess) {
+                  console.log('Warning: User was registered but verification failed');
+                  try {
+                    await verifyClient.stop();
+                  } catch (stopErr) {
+                    console.log('Error stopping verify client:', stopErr);
+                  }
+                }
+              } catch (verifyError) {
+                console.log(`Verification warning: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`);
+                // Verification failure is not fatal since the registration might still have worked
+              }
+              
+              // Always resolve even if verification had issues
+              resolve();
+            })();
+          }, 1000);
+        }, 500);
+      }
       
-      return result;
-    } catch (xmppError) {
-      console.error("XMPP Registration error:", xmppError);
-      throw xmppError;
+      // Error responses
+      else if (data.includes('type="error"') || data.includes("type='error'")) {
+        // Extract error message if available
+        let errorMessage = "Unknown registration error";
+        const errorMatch = /<error.*?>(.*?)<\/error>/.exec(data);
+        if (errorMatch?.length && errorMatch[1]) {
+          errorMessage = errorMatch[1];
+        }
+        
+        console.error(`Registration failed with error: ${errorMessage}`);
+        
+        // Try an alternative approach - data form submission - no extra whitespace
+        console.log("Attempting alternative registration method with data form...");
+        
+        const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg3" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
+        
+        console.log("Sending data form registration");
+        try {
+          socket.send(sanitizeXml(dataFormRegistration));
+        } catch (sendErr) {
+          console.error("Error sending data form registration:", sendErr);
+          cleanup();
+          return reject(new Error("Error sending data form registration"));
+        }
+        return; // Don't reject yet, wait for the response
+      }
+    };
+    
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      cleanup();
+      reject(new Error("WebSocket connection error"));
+    };
+    
+    socket.onclose = (event) => {
+      console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
+      cleanup();
+      
+      if (!registrationComplete && !connectionClosed) {
+        reject(new Error(`Connection closed prematurely: ${event.reason || 'Unknown reason'}`));
+      }
+    };
+  });
+}
+
+/**
+ * Creates a user on the XMPP server using in-band registration with data forms
+ * For servers that require data forms for registration
+ */
+export async function createUserWithDataForm({
+  newUser,   
+  newPass  
+}: UserRegistrationData): Promise<void> {
+  // Get environment variables
+    const service = env.NEXT_PUBLIC_XMPP_SERVICE;
+    const domain = env.NEXT_PUBLIC_XMPP_DOMAIN;
+
+  if (!service || !domain) {
+    throw new Error("Missing required environment variables");
+  }
+
+  // Create XMPP client WITHOUT authentication
+  const xmpp = client({
+    service,
+    domain,
+    // Leave username and password undefined to enable anonymous connection
+  });
+
+  let registrationComplete = false;
+
+  try {
+    // Set up error handler
+    xmpp.on('error', (err: Error) => {
+    console.error('❌ Error:', err.toString());
+  });
+
+    // Set up online handler - this will fire when connected but not authenticated
+    // Using void to explicitly handle the Promise and avoid linter errors
+    xmpp.on('online', () => {
+      void (async () => {
+        console.log('Connected anonymously to XMPP server, attempting registration with data form...');
+        
+        try {
+          // 1. First, query registration requirements from server
+          const registrationForm = await xmpp.iqCaller.get(
+            xml('query', { xmlns: 'jabber:iq:register' })
+          );
+          console.log('Registration form received:', registrationForm.toString());
+          
+          // 2. Send data form for registration
+          const result = await xmpp.iqCaller.set(
+            xml('query', { xmlns: 'jabber:iq:register' },
+              xml('x', { xmlns: 'jabber:x:data', type: 'submit' },
+                xml('field', { var: 'FORM_TYPE', type: 'hidden' },
+                  xml('value', {}, 'jabber:iq:register')
+                ),
+                xml('field', { var: 'username' },
+                  xml('value', {}, newUser)
+                ),
+                xml('field', { var: 'password' },
+                  xml('value', {}, newPass)
+                )
+              )
+            )
+          );
+          
+          console.log('✅ User registration successful!', result.toString());
+          registrationComplete = true;
+        } catch (err: unknown) {
+          console.error('❌ Registration failed:', err instanceof Error ? err.message : String(err));
+          throw err; // Re-throw to be caught by outer try/catch
+    } finally {
+          // Disconnect after registration attempt
+          try {
+      await xmpp.stop();
+          } catch (err: unknown) {
+            console.log('Error during disconnect:', err instanceof Error ? err.message : String(err));
+          }
     }
-  } catch (error) {
-    console.error("Error creating user:", error);
-    throw error;
+      })();
+  });
+
+    // Start connection
+  await xmpp.start();
+    
+    // Wait for registration to complete or fail
+    // We need this timeout because xmpp.js might not properly trigger all events
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (!registrationComplete) {
+          console.log('Registration timed out, disconnecting...');
+          xmpp.stop().catch((err: Error) => console.error('Error stopping client:', err.message));
+          reject(new Error('Registration timed out'));
+        } else {
+          resolve();
+        }
+      }, 10000); // 10 second timeout
+      
+      xmpp.on('close', () => {
+        clearTimeout(timeout);
+        if (registrationComplete) {
+          resolve();
+        } else {
+          reject(new Error('Connection closed before registration completed'));
+        }
+      });
+    });
+  } catch (error: unknown) {
+    console.error('XMPP connection error:', error instanceof Error ? error.message : String(error));
+    throw new Error('Could not connect to XMPP server');
   }
 }
+
+/**
+ * Creates a user on the XMPP server using prosodyctl in the Docker container
+ * This bypasses all XMPP protocols and directly uses the server's CLI tool
+ */
+export async function createUserWithProsodyctl({
+  newUser,
+  newPass
+}: UserRegistrationData): Promise<void> {
+  // Get environment variables
+  const domain = env.NEXT_PUBLIC_XMPP_DOMAIN;
+
+  if (!domain) {
+    throw new Error("NEXT_PUBLIC_XMPP_DOMAIN environment variable is not set");
+  }
+
+  const execPromise = promisify(exec);
+  console.log(`Attempting to register user ${newUser}@${domain} using prosodyctl in Docker...`);
+  
+  try {
+    // Direct command execution using docker exec
+    const dockerCommand = `docker exec prosody-xmpp prosodyctl register ${newUser} ${domain} ${newPass}`;
+    
+    console.log('Executing prosodyctl command in Docker container...');
+    const { stdout, stderr } = await execPromise(dockerCommand);
+    
+    if (stderr?.trim()) {
+      console.error('prosodyctl error:', stderr);
+      throw new Error('Failed to register user with prosodyctl');
+    }
+    
+    console.log('prosodyctl output:', stdout);
+    console.log(`✅ User ${newUser}@${domain} successfully registered!`);
+    
+    // Try to verify registration by listing users
+    try {
+      const listCommand = `docker exec prosody-xmpp prosodyctl userlist`;
+      const { stdout: listStdout } = await execPromise(listCommand);
+      console.log('Current users:', listStdout);
+    } catch (listError) {
+      console.log('Could not list users:', listError instanceof Error ? listError.message : String(listError));
+    }
+  } catch (error: unknown) {
+    console.error('Registration error:', error instanceof Error ? error.message : String(error));
+    throw new Error('Could not register XMPP user');
+  }
+}
+

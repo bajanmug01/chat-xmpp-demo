@@ -27,7 +27,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   
-  // Register mutation at component level
+  // Use the standard registration method
   const registerUser = api.xmpp.registerUser.useMutation();
 
   // Add event listener for XMPP client errors
@@ -70,9 +70,9 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
       }
 
       try {
-        // Register the user on the server
-        await registerUser.mutateAsync({ jid: cleanUsername, password });
-        console.log("User registered successfully");
+        // Register the user on the server using the standard method
+        await registerUser.mutateAsync({ username: cleanUsername, password });
+        console.log("User registered successfully with standard method");
       } catch (registerError) {
         console.error("Registration error:", registerError);
         // If there was an error registering, don't proceed with connection
