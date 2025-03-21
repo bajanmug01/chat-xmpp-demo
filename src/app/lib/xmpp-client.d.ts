@@ -1,4 +1,9 @@
 declare module '@xmpp/client' {
+    export interface IqCaller {
+      get(stanza: XmlElement): Promise<XmlElement>;
+      set(stanza: XmlElement): Promise<XmlElement>;
+    }
+
     export interface XmppClient {
       start(): Promise<void>;
       stop(): Promise<void>;
@@ -8,7 +13,11 @@ declare module '@xmpp/client' {
       on(event: 'stanza', listener: (stanza: XmlElement) => void): void;
       on(event: 'offline', listener: () => void): void;
       on(event: string, listener: (...args: unknown[]) => void): void;
+
+      off(event: 'stanza', listener: (stanza: XmlElement) => void): void;
       off(event: string, listener: (...args: unknown[]) => void): void;
+      
+      iqCaller: IqCaller;
     }
   
     export interface XmlElement {
@@ -18,6 +27,7 @@ declare module '@xmpp/client' {
       getChildText(name: string): string | undefined;
       getChildren(name: string): XmlElement[];
       is(name: string): boolean;
+      toString(): string;
     }
   
     export interface JID {
@@ -31,8 +41,8 @@ declare module '@xmpp/client' {
     export interface ClientOptions {
       service: string;
       domain: string;
-      username: string;
-      password: string;
+      username?: string;
+      password?: string;
       resource?: string;
     }
   

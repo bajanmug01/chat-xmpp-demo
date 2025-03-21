@@ -1,4 +1,5 @@
 # Create the user
+#prosodyctl register admin localhost secretAdminPassword
 docker exec -it prosody-xmpp prosodyctl register alice localhost password123
 
 # Check if the command was successful

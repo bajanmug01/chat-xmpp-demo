@@ -8,6 +8,8 @@ export const env = createEnv({
    */
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]),
+    ADMIN_XMPP_JID: z.string(),
+    ADMIN_XMPP_PASS: z.string(),
   },
 
   /**
@@ -17,8 +19,9 @@ export const env = createEnv({
    */
   client: {
     // NEXT_PUBLIC_CLIENTVAR: z.string(),
-    // TODO: for prod domain and service in environment variables
-    NEXT_PUBLIC_XMPP_SERVICE: z.string().default("xmpp://localhost:5222"),
+    // NEXT_PUBLIC_XMPP_SERVICE: z.string().default("xmpp://localhost:5281"),
+    //NEXT_PUBLIC_XMPP_SERVICE: z.string().default("wss://localhost:5281/xmpp-websocket"),
+    NEXT_PUBLIC_XMPP_SERVICE: z.string().default("ws://localhost:5280/xmpp-websocket"),
     NEXT_PUBLIC_XMPP_DOMAIN: z.string().default("localhost"),
   },
 
@@ -29,6 +32,9 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
+    ADMIN_XMPP_JID: process.env.ADMIN_XMPP_JID,
+    ADMIN_XMPP_PASS: process.env.ADMIN_XMPP_PASS,
+
     NEXT_PUBLIC_XMPP_SERVICE: process.env.NEXT_PUBLIC_XMPP_SERVICE,
     NEXT_PUBLIC_XMPP_DOMAIN: process.env.NEXT_PUBLIC_XMPP_DOMAIN,
   },

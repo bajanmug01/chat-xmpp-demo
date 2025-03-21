@@ -1,5 +1,5 @@
-import { postRouter } from "LA/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "LA/server/api/trpc";
+import { xmppRouter } from "./routers/xmpp";
 
 /**
  * This is the primary router for your server.
@@ -7,7 +7,7 @@ import { createCallerFactory, createTRPCRouter } from "LA/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
+  xmpp: xmppRouter,
 });
 
 // export type definition of API

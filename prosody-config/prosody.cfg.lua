@@ -1,5 +1,8 @@
 -- Basic server setup
-admins = { "admin@localhost" }
+
+--make sure tje jid is the same as the one in the 'create-user.ps1' script
+admins = { "alice@localhost" }
+
 use_libevent = true
 modules_enabled = {
     -- Required modules
@@ -17,6 +20,8 @@ modules_enabled = {
     "csi"; -- Client State Indication for mobile
     "blocklist"; -- Contact blocking
     "pep"; -- Personal Eventing Protocol
+
+    "admin_adhoc"; -- Enables running admin tasks over XMPP Ad-Hoc commands
     
     -- Web interfaces
     "bosh"; "websocket";
@@ -40,6 +45,8 @@ https_ssl = {
 -- Set up your domain
 VirtualHost "localhost"
     authentication = "internal_plain"
+    --authentication = "anonymous"
+    modules_enabled = { "register_ibr" }
     ssl = {
         key = "/etc/prosody/certs/localhost.key";
         certificate = "/etc/prosody/certs/localhost.crt";
