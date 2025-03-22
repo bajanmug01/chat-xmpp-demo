@@ -11,7 +11,7 @@ import { AddContactDialog } from "./add-contact-dialog"
 import { Loader2 } from "lucide-react"
 import { useToast } from "LA/components/ui/use-toast"
 import { useXmppAuth } from "../lib/xmppAuthContext"
-import { XMPPContact, xmppClient } from "../lib/xmppClient"
+import { type XMPPContact, xmppClient } from "../lib/xmppClient"
 
 // Define types needed for the component
 export interface User {
@@ -20,7 +20,7 @@ export interface User {
   isOnline: boolean
 }
 
-interface Contact {
+export interface Contact {
   id: string
   name: string
   isOnline: boolean
@@ -151,21 +151,27 @@ export function ContactList({
       setIsLoading(true)
       
       // Use xmppClient to add contact
-      const success = await xmppClient.addToRoster(contactJid, newContact.name)
+      const result = await xmppClient.addToRoster(contactJid, newContact.name)
       
-      if (success) {
+      if (result.success) {
         toast({
           title: "Contact added",
           description: `${newContact.name} has been added to your contacts`,
         })
+
+        console.log("Successfully added user");
         
         // Refresh contacts
         void fetchContacts()
+        setIsAddContactOpen(false);
       } else {
-        throw new Error("Failed to add contact")
+        // Display specific error message if provided
+        toast({
+          title: "Error adding contact",
+          description: result.error ?? "Failed to add contact",
+          variant: "destructive"
+        });
       }
-      
-      setIsAddContactOpen(false);
     } catch (error) {
       console.error("Error adding contact:", error);
       toast({

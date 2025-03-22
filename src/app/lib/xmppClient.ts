@@ -489,12 +489,14 @@ class XMPPClient extends EventEmitter {
   /**
    * Add a contact to the roster
    */
-  public async addToRoster(jid: string, name?: string): Promise<boolean> {
+  public async addToRoster(jid: string, name?: string): Promise<{ success: boolean; error?: string }> {
     if (!this.connected || !this.xmppClient) {
       throw new Error("Cannot add contact: not connected");
     }
 
     try {
+      // TODO: Check if user exists
+      
       // Send roster set IQ stanza
       const rosterSetId = `roster_set_${Math.random().toString(36).substring(2, 15)}`;
 
@@ -534,10 +536,10 @@ class XMPPClient extends EventEmitter {
         this.emit("contactsUpdated", this.contacts);
       }
 
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error("Error adding contact to roster:", error);
-      return false;
+      console.error("Error adding contact to roster:", error instanceof Error ? error.message : error);
+      return { success: false, error: "Error adding contact" };
     }
   }
 }
