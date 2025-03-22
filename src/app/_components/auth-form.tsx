@@ -3,7 +3,6 @@
 import type React from "react";
 
 import { useState, useEffect } from "react";
-import { type User } from "../lib/types";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
@@ -18,6 +17,7 @@ import { xmppClient } from "../lib/xmppClient";
 import { api } from "LA/trpc/react";
 import { Loader2 } from "lucide-react";
 import { useXmppAuth } from "../lib/xmppAuthContext";
+import { type User } from "./contact-list";
 
 interface AuthFormProps {
   onLogin: (user: User) => void;
@@ -111,7 +111,6 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
         password: password
       });
       
-      // TODO: In real application login via auth (Managing xmpp username and pw for user in Backend)
       // Try to connect with a timeout to ensure we don't wait forever
       const connected = await xmppClient.connect(cleanUsername, password);
       if (!connected) {

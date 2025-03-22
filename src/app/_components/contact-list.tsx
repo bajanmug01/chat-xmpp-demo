@@ -3,17 +3,30 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Search, Plus, LogOut } from "lucide-react"
-import { type Contact, type User, type GetContactsMutationResult, type AddContactMutationResult } from "../lib/types"
 import { Button } from "LA/components/ui/button"
 import { Switch } from "LA/components/ui/switch"
 import { Label } from "LA/components/ui/label"
 import { Input } from "LA/components/ui/input"
 import { AddContactDialog } from "./add-contact-dialog"
-import { api } from "LA/trpc/react"
 import { Loader2 } from "lucide-react"
 import { useToast } from "LA/components/ui/use-toast"
 import { useXmppAuth } from "../lib/xmppAuthContext"
+import { XMPPContact, xmppClient } from "../lib/xmppClient"
 
+// Define types needed for the component
+export interface User {
+  id: string
+  username: string
+  isOnline: boolean
+}
+
+interface Contact {
+  id: string
+  name: string
+  isOnline: boolean
+  avatar?: string
+  lastSeen: Date | string
+}
 interface ContactListProps {
   user: User
   onLogout: () => void
@@ -34,54 +47,72 @@ export function ContactList({
   const [contacts, setContacts] = useState<Contact[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddContactOpen, setIsAddContactOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const { credentials, clearCredentials } = useXmppAuth()
   const { toast } = useToast()
-
-  // Use tRPC to get contacts with proper typing
-  const getContacts = api.xmppContacts.getContacts.useMutation({
-    onSuccess: (data) => {
-      setContacts(data.contacts)
-    },
-    onError: (error) => {
-      toast({
-        title: "Error fetching contacts",
-        description: error.message,
-        variant: "destructive"
-      })
-    }
-  }) as GetContactsMutationResult
-
-  const addContact = api.xmppContacts.addContact.useMutation({
-    onSuccess: () => {
-      // Refresh the contact list
-      void fetchContacts()
-    },
-    onError: (error) => {
-      toast({
-        title: "Error adding contact",
-        description: error.message,
-        variant: "destructive"
-      })
-    }
-  }) as AddContactMutationResult
 
   // Filter contacts based on search query
   const filteredContacts = contacts.filter((contact) => 
     contact.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Fetch contacts on component mount
+  // Fetch contacts on component mount and when user/credentials change
   useEffect(() => {
     void fetchContacts()
+    
+    // Listen for contacts updated events from xmppClient
+    const handleContactsUpdated = (updatedContacts: XMPPContact[]) => {
+      const mappedContacts = mapXmppContactsToContacts(updatedContacts)
+      setContacts(mappedContacts)
+    }
+    
+    xmppClient.on('contactsUpdated', handleContactsUpdated)
+    
+    // Clean up event listener
+    return () => {
+      xmppClient.off('contactsUpdated', handleContactsUpdated)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, credentials])
 
+  // Helper function to map XMPP contacts to our Contact interface
+  const mapXmppContactsToContacts = (xmppContacts: XMPPContact[]): Contact[] => {
+    return xmppContacts.map(contact => ({
+      id: contact.id,
+      name: contact.name,
+      isOnline: contact.status === 'online',
+      avatar: contact.avatar,
+      lastSeen: contact.lastMessageTime
+    }))
+  }
+
   const fetchContacts = async () => {
-    if (user && credentials?.password) {
-      await getContacts.mutateAsync({
-        username: user.username,
-        password: credentials.password
+    if (!user?.username || !credentials?.password) return
+    
+    try {
+      setIsLoading(true)
+      
+      // Check if already connected
+      if (!xmppClient.isConnected()) {
+        // Connect to XMPP server
+        const connected = await xmppClient.connect(user.username, credentials.password)
+        if (!connected) {
+          throw new Error("Failed to connect to XMPP server")
+        }
+      }
+      
+      // Get contacts from xmppClient
+      const xmppContacts = xmppClient.getContacts()
+      const mappedContacts = mapXmppContactsToContacts(xmppContacts)
+      setContacts(mappedContacts)
+    } catch (error) {
+      toast({
+        title: "Error fetching contacts",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -96,20 +127,18 @@ export function ContactList({
       return
     }
 
-    // Extract the username from the contact - ensure it's always a string
-    let contactUsername = "";
+    // Extract the username from the contact
+    let contactJid = "";
     
     if (newContact.id.includes('@')) {
-      const parts = newContact.id.split('@');
-      if (parts.length > 0) {
-        contactUsername = parts[0] ?? "";
-      }
+      contactJid = newContact.id
     } else {
-      contactUsername = newContact.id;
+      // Add domain if not present
+      contactJid = `${newContact.id}@${new URL(process.env.NEXT_PUBLIC_XMPP_SERVICE ?? "").hostname}`
     }
     
-    // Safety check - only proceed if we have a valid username
-    if (!contactUsername) {
+    // Safety check - only proceed if we have a valid JID
+    if (!contactJid) {
       toast({
         title: "Invalid contact",
         description: "The contact ID is invalid",
@@ -119,21 +148,21 @@ export function ContactList({
     }
     
     try {
-      // Create the parameters object with required fields
-      const contactParams = {
-        username: user.username,
-        password: credentials.password,
-        contactUsername,
-      };
+      setIsLoading(true)
       
-      // Only add the name parameter if it's different from the username
-      if (newContact.name !== contactUsername) {
-        await addContact.mutateAsync({
-          ...contactParams,
-          name: newContact.name
-        });
+      // Use xmppClient to add contact
+      const success = await xmppClient.addToRoster(contactJid, newContact.name)
+      
+      if (success) {
+        toast({
+          title: "Contact added",
+          description: `${newContact.name} has been added to your contacts`,
+        })
+        
+        // Refresh contacts
+        void fetchContacts()
       } else {
-        await addContact.mutateAsync(contactParams);
+        throw new Error("Failed to add contact")
       }
       
       setIsAddContactOpen(false);
@@ -144,20 +173,29 @@ export function ContactList({
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // Handle logout with credential clearing
-  const handleLogout = () => {
-    clearCredentials()
-    onLogout()
+  const handleLogout = async () => {
+    try {
+      // Disconnect from XMPP server
+      if (xmppClient.isConnected()) {
+        await xmppClient.disconnect()
+      }
+      
+      clearCredentials()
+      onLogout()
+    } catch (error) {
+      console.error("Error during logout:", error)
+      
+      // Still clear credentials and log out even if there's an error
+      clearCredentials()
+      onLogout()
+    }
   }
-
-  // Helper function to safely check loading state
-  const isLoading = Boolean(
-    getContacts.isPending || 
-    addContact.isPending
-  );
 
   return (
     <div className="flex flex-col h-full">
@@ -243,7 +281,7 @@ export function ContactList({
               >
                 <div className="relative">
                   <Image
-                    src={contact.avatar || "/placeholder.svg"}
+                    src={contact.avatar ?? "/placeholder.svg"}
                     alt={contact.name}
                     width={compact ? 32 : 40}
                     height={compact ? 32 : 40}
