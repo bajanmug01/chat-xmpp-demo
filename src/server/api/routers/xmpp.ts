@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "LA/server/api/trpc";
-import { createUser } from "LA/server/xmppAdmin";
+import { createUser } from "LA/server/xmppHelper";
 
 export const xmppRouter = createTRPCRouter({
   registerUser: publicProcedure
