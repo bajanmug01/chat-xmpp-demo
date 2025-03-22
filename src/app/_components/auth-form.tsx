@@ -45,7 +45,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
   }, []);
 
   // TODO: while waiting for signup make signupbutton not klickable and show loading symbol
-  // TODO: Add sign in and error handling if existing user tries to sign up or handel as sign in
+  // TODO: Add sign in button to log in
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     

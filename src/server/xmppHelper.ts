@@ -330,29 +330,67 @@ export async function createUser({
       else if (data.includes('type="error"') || data.includes("type='error'")) {
         // Extract error message if available
         let errorMessage = "Unknown registration error";
-        const errorMatch = /<error.*?>(.*?)<\/error>/.exec(data);
-        if (errorMatch?.length && errorMatch[1]) {
-          errorMessage = errorMatch[1];
+        
+        // Look for text element which usually contains human-readable error message
+        const textMatch = /<text.*?>(.*?)<\/text>/.exec(data);
+        if (textMatch?.length && textMatch[1]) {
+          errorMessage = textMatch[1];
+        } else {
+          // Fallback to get something from error element
+          const errorMatch = /<error.*?>(.*?)<\/error>/.exec(data);
+          if (errorMatch?.length && errorMatch[1]) {
+            errorMessage = errorMatch[1];
+          }
         }
 
         console.error(`Registration failed with error: ${errorMessage}`);
 
-        // Try an alternative approach - data form submission - no extra whitespace
-        console.log(
-          "Attempting alternative registration method with data form...",
-        );
-
-        const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg3" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
-
-        console.log("Sending data form registration");
-        try {
-          socket.send(sanitizeXml(dataFormRegistration));
-        } catch (sendErr) {
-          console.error("Error sending data form registration:", sendErr);
+        // Check for user already exists error (conflict)
+        if (data.includes('<conflict') || errorMessage.toLowerCase().includes('already exists')) {
+          console.error(`User ${newUser}@${domain} already exists`);
           cleanup();
-          return reject(new Error("Error sending data form registration"));
+          return reject(new Error(`User already exists: ${newUser}@${domain}`));
         }
-        return; // Don't reject yet, wait for the response
+        
+        // Check for other specific error types
+        if (data.includes('<not-authorized')) {
+          cleanup();
+          return reject(new Error("Not authorized to register users"));
+        }
+        
+        if (data.includes('<resource-constraint')) {
+          cleanup();
+          return reject(new Error("Server resource constraints prevented registration"));
+        }
+        
+        if (data.includes('<not-acceptable')) {
+          cleanup();
+          return reject(new Error("Registration data was not acceptable (username or password may not meet requirements)"));
+        }
+
+        // Only try alternative registration if we haven't already tried
+        if (!data.includes(`id="${stanzaId}-reg3"`)) {
+          // Try an alternative approach - data form submission - no extra whitespace
+          console.log(
+            "Attempting alternative registration method with data form...",
+          );
+
+          const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg3" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
+
+          console.log("Sending data form registration");
+          try {
+            socket.send(sanitizeXml(dataFormRegistration));
+          } catch (sendErr) {
+            console.error("Error sending data form registration:", sendErr);
+            cleanup();
+            return reject(new Error("Error sending data form registration"));
+          }
+          return; // Don't reject yet, wait for the response
+        } else {
+          // We've already tried the alternative method, just report the error
+          cleanup();
+          return reject(new Error(`XMPP registration failed: ${errorMessage}`));
+        }
       }
     };
 
