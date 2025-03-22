@@ -1,6 +1,7 @@
 declare module '@xmpp/client' {
     export interface IqCaller {
       get(stanza: XmlElement): Promise<XmlElement>;
+      get(type: Record<string, string>, query: XmlElement): Promise<XmlElement>;
       set(stanza: XmlElement): Promise<XmlElement>;
     }
 
@@ -21,13 +22,21 @@ declare module '@xmpp/client' {
     }
   
     export interface XmlElement {
-      attrs: Record<string, string>;
+      attrs: Record<string, string | undefined>;
       append(child: XmlElement): void;
       getChild(name: string, xmlns?: string): XmlElement | undefined;
       getChildText(name: string): string | undefined;
       getChildren(name: string): XmlElement[];
       is(name: string): boolean;
       toString(): string;
+      name?: string;
+      children?: XmlElement[];
+    }
+  
+    export interface XmlElementDefinition {
+      name: string;
+      attrs?: Record<string, string | undefined>;
+      children?: XmlElementDefinition[];
     }
   
     export interface JID {

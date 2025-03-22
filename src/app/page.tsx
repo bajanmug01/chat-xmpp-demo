@@ -67,7 +67,8 @@ export default function Home() {
     const newMessage: Message = {
       id: Date.now().toString(),
       senderId: session.user.id,
-      content,
+      text: content,
+      isRead: false, // TODO 
       timestamp: new Date(),
     };
 

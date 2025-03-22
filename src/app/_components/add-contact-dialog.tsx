@@ -8,6 +8,7 @@ import { type Contact } from "../lib/types"
 import { Label } from "LA/components/ui/label"
 import { Button } from "LA/components/ui/button"
 import { Input } from "LA/components/ui/input"
+import { env } from "LA/env"
 
 interface AddContactDialogProps {
   open: boolean
@@ -16,29 +17,43 @@ interface AddContactDialogProps {
 }
 
 export function AddContactDialog({ open, onOpenChange, onAddContact }: AddContactDialogProps) {
-  const [name, setName] = useState("")
+  const [username, setUsername] = useState("")
+  const [displayName, setDisplayName] = useState("")
   const [error, setError] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!name.trim()) {
-      setError("Please enter a contact name")
+    if (!username.trim()) {
+      setError("Please enter a contact username")
       return
     }
 
+    // Clean up the username - if it includes @domain, use as is, otherwise add domain
+    const domain = env.NEXT_PUBLIC_XMPP_DOMAIN
+    const jid = username.includes('@') ? username : `${username}@${domain}`
+
     // Create a new contact
     const newContact: Contact = {
-      id: Date.now().toString(),
-      name: name.trim(),
+      id: jid, // Use the full JID as the ID
+      name: displayName.trim() || username.trim(), // Use display name if provided, otherwise username
       lastSeen: new Date(),
       isOnline: false,
       avatar: "/placeholder.svg?height=40&width=40",
     }
 
     onAddContact(newContact)
-    setName("")
+    setUsername("")
+    setDisplayName("")
     setError("")
+  }
+
+  const handleCancel = () => {
+    // Clear form and close
+    setUsername("")
+    setDisplayName("")
+    setError("")
+    onOpenChange(false)
   }
 
   return (
@@ -50,18 +65,27 @@ export function AddContactDialog({ open, onOpenChange, onAddContact }: AddContac
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="contact-name">Contact Name</Label>
+              <Label htmlFor="contact-username">Username or JID</Label>
               <Input
-                id="contact-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter contact name"
+                id="contact-username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username or full JID"
               />
-              {error && <p className="text-sm text-red-500">{error}</p>}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-display-name">Display Name (optional)</Label>
+              <Input
+                id="contact-display-name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter display name for this contact"
+              />
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
             <Button type="submit">Add Contact</Button>

@@ -1,34 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Search, Plus, LogOut } from "lucide-react"
-import { type Contact, type User } from "../lib/types"
+import { type Contact, type User, type GetContactsMutationResult, type AddContactMutationResult } from "../lib/types"
 import { Button } from "LA/components/ui/button"
 import { Switch } from "LA/components/ui/switch"
 import { Label } from "LA/components/ui/label"
 import { Input } from "LA/components/ui/input"
 import { AddContactDialog } from "./add-contact-dialog"
-
-// Demo contacts data
-const demoContacts: Contact[] = [
-  { id: "1", name: "John Doe", lastSeen: new Date(), isOnline: true, avatar: "/placeholder.svg?height=40&width=40" },
-  {
-    id: "2",
-    name: "Jane Smith",
-    lastSeen: new Date(Date.now() - 1000 * 60 * 5),
-    isOnline: false,
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  { id: "3", name: "Bob Johnson", lastSeen: new Date(), isOnline: true, avatar: "/placeholder.svg?height=40&width=40" },
-  {
-    id: "4",
-    name: "Alice Brown",
-    lastSeen: new Date(Date.now() - 1000 * 60 * 30),
-    isOnline: false,
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-]
+import { api } from "LA/trpc/react"
+import { Loader2 } from "lucide-react"
+import { useToast } from "LA/components/ui/use-toast"
+import { useXmppAuth } from "../lib/xmppAuthContext"
 
 interface ContactListProps {
   user: User
@@ -47,18 +31,133 @@ export function ContactList({
   onToggleOnlineStatus,
   compact = false,
 }: ContactListProps) {
-  const [contacts, setContacts] = useState<Contact[]>(demoContacts)
+  const [contacts, setContacts] = useState<Contact[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddContactOpen, setIsAddContactOpen] = useState(false)
+  const { credentials, clearCredentials } = useXmppAuth()
+  const { toast } = useToast()
+
+  // Use tRPC to get contacts with proper typing
+  const getContacts = api.xmppContacts.getContacts.useMutation({
+    onSuccess: (data) => {
+      setContacts(data.contacts)
+    },
+    onError: (error) => {
+      toast({
+        title: "Error fetching contacts",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
+  }) as GetContactsMutationResult
+
+  const addContact = api.xmppContacts.addContact.useMutation({
+    onSuccess: () => {
+      // Refresh the contact list
+      void fetchContacts()
+    },
+    onError: (error) => {
+      toast({
+        title: "Error adding contact",
+        description: error.message,
+        variant: "destructive"
+      })
+    }
+  }) as AddContactMutationResult
 
   // Filter contacts based on search query
-  const filteredContacts = contacts.filter((contact) => contact.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredContacts = contacts.filter((contact) => 
+    contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Fetch contacts on component mount
+  useEffect(() => {
+    void fetchContacts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, credentials])
+
+  const fetchContacts = async () => {
+    if (user && credentials?.password) {
+      await getContacts.mutateAsync({
+        username: user.username,
+        password: credentials.password
+      })
+    }
+  }
 
   // Add a new contact
-  const handleAddContact = (newContact: Contact) => {
-    setContacts([...contacts, newContact])
-    setIsAddContactOpen(false)
+  const handleAddContact = async (newContact: Contact) => {
+    if (!credentials?.password) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in again to add contacts",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Extract the username from the contact - ensure it's always a string
+    let contactUsername = "";
+    
+    if (newContact.id.includes('@')) {
+      const parts = newContact.id.split('@');
+      if (parts.length > 0) {
+        contactUsername = parts[0] ?? "";
+      }
+    } else {
+      contactUsername = newContact.id;
+    }
+    
+    // Safety check - only proceed if we have a valid username
+    if (!contactUsername) {
+      toast({
+        title: "Invalid contact",
+        description: "The contact ID is invalid",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Create the parameters object with required fields
+      const contactParams = {
+        username: user.username,
+        password: credentials.password,
+        contactUsername,
+      };
+      
+      // Only add the name parameter if it's different from the username
+      if (newContact.name !== contactUsername) {
+        await addContact.mutateAsync({
+          ...contactParams,
+          name: newContact.name
+        });
+      } else {
+        await addContact.mutateAsync(contactParams);
+      }
+      
+      setIsAddContactOpen(false);
+    } catch (error) {
+      console.error("Error adding contact:", error);
+      toast({
+        title: "Error adding contact",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
+      });
+    }
   }
+
+  // Handle logout with credential clearing
+  const handleLogout = () => {
+    clearCredentials()
+    onLogout()
+  }
+
+  // Helper function to safely check loading state
+  const isLoading = Boolean(
+    getContacts.isPending || 
+    addContact.isPending
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -70,7 +169,7 @@ export function ContactList({
               <div className="font-medium">{user.username}</div>
               <div className={`h-2 w-2 rounded-full ${user.isOnline ? "bg-green-500" : "bg-gray-400"}`}></div>
             </div>
-            <Button variant="ghost" size="icon" onClick={onLogout}>
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
@@ -114,15 +213,25 @@ export function ContactList({
             size={compact ? "sm" : "icon"}
             className={compact ? "h-7 w-7 p-0" : ""}
             onClick={() => setIsAddContactOpen(true)}
+            disabled={isLoading}
           >
-            <Plus className={compact ? "h-3 w-3" : "h-4 w-4"} />
+            {isLoading ? (
+              <Loader2 className={compact ? "h-3 w-3 animate-spin" : "h-4 w-4 animate-spin"} />
+            ) : (
+              <Plus className={compact ? "h-3 w-3" : "h-4 w-4"} />
+            )}
           </Button>
         </div>
       </div>
 
       {/* Contacts list */}
       <div className="flex-1 overflow-y-auto">
-        {filteredContacts.length > 0 ? (
+        {isLoading && (
+          <div className="flex justify-center items-center h-24">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          </div>
+        )}
+        {!isLoading && filteredContacts.length > 0 ? (
           <ul>
             {filteredContacts.map((contact) => (
               <li
@@ -157,11 +266,13 @@ export function ContactList({
               </li>
             ))}
           </ul>
-        ) : (
+        ) : !isLoading ? (
           <div className={`${compact ? "p-2" : "p-4"} text-center text-gray-500 ${compact ? "text-sm" : ""}`}>
-            No contacts found
+            {filteredContacts.length === 0 && contacts.length > 0
+              ? "No matching contacts"
+              : "No contacts found. Add some contacts to get started."}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Add contact dialog */}

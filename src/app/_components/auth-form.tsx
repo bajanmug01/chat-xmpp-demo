@@ -17,6 +17,7 @@ import {
 import { xmppClient } from "../lib/xmppClient";
 import { api } from "LA/trpc/react";
 import { Loader2 } from "lucide-react";
+import { useXmppAuth } from "../lib/xmppAuthContext";
 
 interface AuthFormProps {
   onLogin: (user: User) => void;
@@ -28,6 +29,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { setCredentials } = useXmppAuth();
   
   // Register user on xmpp server
   const registerUser = api.xmpp.registerUser.useMutation();
@@ -103,11 +105,19 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
       // Connect with the same clean username (for both sign-in and sign-up)
       console.log(`Connecting with XMPP username: ${cleanUsername}`);
       
+      // Store credentials in the secure context
+      setCredentials({
+        username: cleanUsername,
+        password: password
+      });
+      
+      // TODO: In real application login via auth (Managing xmpp username and pw for user in Backend)
       // Try to connect with a timeout to ensure we don't wait forever
       const connected = await xmppClient.connect(cleanUsername, password);
       if (!connected) {
         setError("Failed to connect. Check your credentials or try again later.");
         setIsLoading(false);
+        setCredentials(null);
         return;
       }
 
@@ -124,6 +134,7 @@ export function AuthForm({ onLogin, compact = false }: AuthFormProps) {
       console.error("Authentication error:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred");
       setIsLoading(false);
+      setCredentials(null);
     }
   };
 

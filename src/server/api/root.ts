@@ -1,5 +1,6 @@
 import { createCallerFactory, createTRPCRouter } from "LA/server/api/trpc";
 import { xmppRouter } from "./routers/xmpp";
+import { xmppContactsRouter } from "./routers/xmppContacts";
 
 /**
  * This is the primary router for your server.
@@ -8,6 +9,7 @@ import { xmppRouter } from "./routers/xmpp";
  */
 export const appRouter = createTRPCRouter({
   xmpp: xmppRouter,
+  xmppContacts: xmppContactsRouter,
 });
 
 // export type definition of API
