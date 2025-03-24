@@ -1,7 +1,7 @@
 // https://github.com/xmppjs/xmpp.js/tree/main/packages/client
 
 import { EventEmitter } from "events";
-import { client, xml, XmppClient, XmlElement } from "@xmpp/client";
+import { client, xml, type XmppClient, type XmlElement } from "@xmpp/client";
 import { env } from "LA/env";
 
 // Types for XMPP messages and contacts
@@ -437,53 +437,6 @@ class XMPPClient extends EventEmitter {
         }
       }
     }
-  }
-
-  /**
-   * Simulate an incoming message (for testing purposes)
-   * This method creates a message as if it was received from another user
-   */
-  async simulateIncomingMessage(
-    from: string,
-    body: string,
-  ): Promise<XMPPMessage> {
-    // Generate a random message ID
-    const messageId = Math.random().toString(36).substring(2, 15);
-
-    // Create the message object
-    const messageObj: XMPPMessage = {
-      id: messageId,
-      from,
-      to: this.currentUser ?? "",
-      body,
-      timestamp: new Date(),
-    };
-
-    // Find the contact
-    const contact = this.contacts.find((c) => c.jid === from);
-    if (!contact) {
-      throw new Error(`Cannot simulate message: contact ${from} not found`);
-    }
-
-    // Add to messages
-    if (!this.messages[contact.id]) {
-      this.messages[contact.id] = [];
-    }
-
-    // Add the message to the contact's message list
-    this.messages[contact.id]?.push(messageObj);
-
-    // Increment unread count
-    contact.unreadCount += 1;
-
-    // Update last message time
-    contact.lastMessageTime = new Date().toISOString();
-
-    // Emit events
-    this.emit("message", messageObj);
-    this.emit("unreadCountChanged", contact.id);
-
-    return messageObj;
   }
 
   /**

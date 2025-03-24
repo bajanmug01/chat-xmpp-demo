@@ -4,7 +4,7 @@ import type React from "react";
 
 import { useState } from "react";
 import { ArrowLeft, Paperclip, Mic, Send, X } from "lucide-react";
-import { Conversation, Message } from "../lib/types";
+import { type Conversation, type Message } from "../lib/types";
 import { Button } from "LA/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "LA/components/ui/avatar";
 import MessageBubble from "./message-bubble";
