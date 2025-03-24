@@ -1,5 +1,6 @@
 import { cn } from "LA/lib/utils";
 import { type XMPPMessage } from "../lib/xmppClient";
+import { useAuth } from "../lib/auth-context";
 
 interface MessageBubbleProps {
   message: XMPPMessage;
@@ -10,7 +11,10 @@ export default function MessageBubble({
   message,
   isGroup,
 }: MessageBubbleProps) {
-  const isMe = message.from === "me";
+  const user = useAuth();
+  const isMe = message.from === user.user?.name;
+
+  console.log("user name: ", user.user?.name);
 
   return (
     <div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
