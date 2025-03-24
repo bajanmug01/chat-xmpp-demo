@@ -4,7 +4,6 @@ import type React from "react";
 
 import { useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { type Conversation } from "../lib/types";
 import {
   Dialog,
   DialogContent,
@@ -16,11 +15,12 @@ import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
+import { type XMPPContact } from "../lib/xmppClient";
 
 interface AddContactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddContact: (contact: Omit<Conversation, "id">) => void;
+  onAddContact: (contact: Omit<XMPPContact, "id">) => void;
 }
 
 export function AddContactDialog({
@@ -43,14 +43,16 @@ export function AddContactDialog({
 
     setIsSubmitting(true);
 
+    //TODO:  public async addToRoster(jid: string, name?: string): 
+
     // Create a new contact
-    const newContact: Omit<Conversation, "id"> = {
+    const newContact: Omit<XMPPContact, "id"> = {
+      jid: name,
       name: name.trim(),
       avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.charAt(0))}`,
-      lastMessage: "",
-      timestamp: "Just now",
-      unread: 0,
-      online: false,
+      lastMessageTime: "Just now",
+      unreadCount: 0,
+      status: "online",
     };
 
     // Add the contact

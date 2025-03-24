@@ -1,14 +1,17 @@
-import { Check, CheckCheck } from "lucide-react"
-import { type Message } from "../lib/types"
-import { cn } from "LA/lib/utils"
+import { Check, CheckCheck } from "lucide-react";
+import { cn } from "LA/lib/utils";
+import { XMPPMessage } from "../lib/xmppClient";
 
 interface MessageBubbleProps {
-  message: Message
-  isGroup?: boolean
+  message: XMPPMessage;
+  isGroup?: boolean;
 }
 
-export default function MessageBubble({ message, isGroup }: MessageBubbleProps) {
-  const isMe = message.sender === "me"
+export default function MessageBubble({
+  message,
+  isGroup,
+}: MessageBubbleProps) {
+  const isMe = message.from === "me";
 
   return (
     <div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
@@ -16,26 +19,27 @@ export default function MessageBubble({ message, isGroup }: MessageBubbleProps) 
         className={cn(
           "max-w-[70%] rounded-lg px-3 py-2 text-sm",
           isMe
-            ? "bg-green-100 dark:bg-green-900 text-gray-800 dark:text-gray-100 rounded-tr-none"
-            : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-tl-none",
+            ? "rounded-tr-none bg-green-100 text-gray-800 dark:bg-green-900 dark:text-gray-100"
+            : "rounded-tl-none bg-white text-gray-800 dark:bg-gray-800 dark:text-gray-100",
         )}
       >
-        {isGroup && !isMe && message.senderName && (
-          <div className="font-medium text-xs text-blue-600 dark:text-blue-400 mb-1">{message.senderName}</div>
+        {isGroup && !isMe && message.from && (
+          <div className="mb-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+            {message.from}
+          </div>
         )}
-        <div>{message.text}</div>
-        <div className="flex justify-end items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
+        <div>{message.body}</div>
+        <div className="mt-1 flex items-center justify-end gap-1 text-xs text-gray-500 dark:text-gray-400">
           <span>{message.timestamp}</span>
           {isMe && (
             <>
-              {message.status === "sent" && <Check className="h-3 w-3" />}
-              {message.status === "delivered" && <CheckCheck className="h-3 w-3" />}
-              {message.status === "read" && <CheckCheck className="h-3 w-3 text-blue-500" />}
+              {/*message.status === "sent" && <Check className="h-3 w-3" />*/}
+              {/*message.status === "delivered" && <CheckCheck className="h-3 w-3" />*/}
+              {/*message.status === "read" && <CheckCheck className="h-3 w-3 text-blue-500" />*/}
             </>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
-

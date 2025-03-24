@@ -10,8 +10,9 @@ export type XMPPMessage = {
   from: string;
   to: string;
   body: string;
-  timestamp: Date;
+  timestamp: string;
   encrypted?: boolean;
+  //status: "read" | "unread";
 };
 
 export type XMPPContact = {
@@ -206,7 +207,7 @@ class XMPPClient extends EventEmitter {
       from: this.currentUser,
       to,
       body: processedBody,
-      timestamp: new Date(),
+      timestamp: new Date().toLocaleDateString(),
     };
 
     // Add to messages
@@ -345,7 +346,7 @@ class XMPPClient extends EventEmitter {
           from: bareJid,
           to: this.currentUser,
           body,
-          timestamp: new Date(),
+          timestamp: new Date().toLocaleDateString(),
         };
 
         // Add to messages

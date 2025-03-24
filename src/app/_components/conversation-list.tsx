@@ -2,20 +2,20 @@
 
 import { useState } from "react";
 import { Search, LogOut, Plus, X } from "lucide-react";
-import { type Conversation } from "../lib/types";
 import { type User } from "../lib/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "LA/components/ui/avatar";
 import { Button } from "LA/components/ui/button";
 import { Input } from "LA/components/ui/input";
 import { cn } from "LA/lib/utils";
 import { AddContactDialog } from "./add-contact-dialog";
+import { type XMPPContact } from "../lib/xmppClient";
 
 interface ConversationListProps {
-  conversations: Conversation[];
+  conversations: XMPPContact[];
   activeConversationId?: string;
-  onSelectConversation: (conversation: Conversation) => void;
+  onSelectConversation: (conversation: XMPPContact) => void;
   onLogout: () => void;
-  onAddContact: (contact: Omit<Conversation, "id">) => void;
+  onAddContact: (contact: Omit<XMPPContact, "id">) => void;
   currentUser: User;
 }
 
@@ -118,7 +118,7 @@ export default function ConversationList({
                   />
                   <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
                 </Avatar>
-                {conversation.online && (
+                {conversation.status && (
                   <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500 dark:border-gray-900"></span>
                 )}
               </div>
@@ -128,16 +128,16 @@ export default function ConversationList({
                     {conversation.name}
                   </h3>
                   <span className="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-                    {conversation.timestamp}
+                    {conversation.lastMessageTime}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="truncate text-sm text-gray-500 dark:text-gray-400">
-                    {conversation.lastMessage || "No messages yet"}
+                    {"TODO: last Message"/* show last message*/} 
                   </p>
-                  {conversation.unread > 0 && (
+                  {conversation.unreadCount > 0 && (
                     <span className="ml-2 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-xs text-white">
-                      {conversation.unread}
+                      {conversation.unreadCount}
                     </span>
                   )}
                 </div>

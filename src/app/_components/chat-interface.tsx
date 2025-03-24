@@ -2,208 +2,46 @@
 
 import { useState } from "react";
 import { useMediaQuery } from "../hooks/use-media-query";
-import { Conversation, Message } from "../lib/types";
 import { useAuth } from "../lib/auth-context";
 import ConversationList from "./conversation-list";
 import ChatWindow from "./chat-window";
+import { type XMPPContact, type XMPPMessage } from "../lib/xmppClient";
 
 export default function ChatInterface() {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [activeConversation, setActiveConversation] =
-    useState<Conversation | null>(null);
+    useState<XMPPContact | null>(null);
   const [showConversations, setShowConversations] = useState(true);
   const { user, logout } = useAuth();
 
-  // Sample data
-  const [conversations, setConversations] = useState<Conversation[]>([
+  // getContacts()  XMPPContact
+  const [conversations, setConversations] = useState<XMPPContact[]>([
     {
       id: "1",
+      jid: "John",
       name: "John Doe",
       avatar: "/placeholder.svg?height=40&width=40",
-      lastMessage: "Hey, how are you?",
-      timestamp: "10:30 AM",
-      unread: 2,
-      online: true,
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      avatar: "/placeholder.svg?height=40&width=40",
-      lastMessage: "Can we meet tomorrow?",
-      timestamp: "Yesterday",
-      unread: 0,
-      online: false,
-    },
-    {
-      id: "3",
-      name: "Tech Group",
-      avatar: "/placeholder.svg?height=40&width=40",
-      lastMessage: "Alice: Check out this new framework!",
-      timestamp: "Yesterday",
-      unread: 5,
-      online: false,
-      isGroup: true,
-    },
-    {
-      id: "4",
-      name: "Mom",
-      avatar: "/placeholder.svg?height=40&width=40",
-      lastMessage: "Call me when you're free",
-      timestamp: "Monday",
-      unread: 0,
-      online: true,
-    },
-    {
-      id: "5",
-      name: "Work Team",
-      avatar: "/placeholder.svg?height=40&width=40",
-      lastMessage: "Boss: Don't forget the meeting at 3",
-      timestamp: "Monday",
-      unread: 0,
-      online: false,
-      isGroup: true,
+      //lastMessage: "Hey, how are you?",
+      lastMessageTime: "10:30 AM",
+      unreadCount: 2,
+      status: "online",
     },
   ]);
 
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
+  // getMessages(contactId: string)
+  const [messages, setMessages] = useState<Record<string, XMPPMessage[]>>({
     "1": [
       {
         id: "1",
-        text: "Hey, how are you?",
-        sender: "them",
-        timestamp: "10:30 AM",
-        status: "read",
-      },
-      {
-        id: "2",
-        text: "I'm good, thanks! How about you?",
-        sender: "me",
-        timestamp: "10:31 AM",
-        status: "read",
-      },
-      {
-        id: "3",
-        text: "Doing well. Any plans for the weekend?",
-        sender: "them",
-        timestamp: "10:32 AM",
-        status: "read",
-      },
-    ],
-    "2": [
-      {
-        id: "1",
-        text: "Hi Jane, do you have time to meet?",
-        sender: "me",
-        timestamp: "Yesterday",
-        status: "read",
-      },
-      {
-        id: "2",
-        text: "Sure, what's it about?",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "read",
-      },
-      {
-        id: "3",
-        text: "Can we meet tomorrow?",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "delivered",
-      },
-    ],
-    "3": [
-      {
-        id: "1",
-        text: "Welcome to the Tech Group!",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "read",
-        senderName: "Admin",
-      },
-      {
-        id: "2",
-        text: "Thanks for adding me!",
-        sender: "me",
-        timestamp: "Yesterday",
-        status: "read",
-      },
-      {
-        id: "3",
-        text: "Has anyone tried the new React 18?",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "read",
-        senderName: "Bob",
-      },
-      {
-        id: "4",
-        text: "Yes, the concurrent features are amazing!",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "read",
-        senderName: "Alice",
-      },
-      {
-        id: "5",
-        text: "Check out this new framework!",
-        sender: "them",
-        timestamp: "Yesterday",
-        status: "delivered",
-        senderName: "Alice",
-      },
-    ],
-    "4": [
-      {
-        id: "1",
-        text: "Hi sweetie, how are you doing?",
-        sender: "them",
-        timestamp: "Monday",
-        status: "read",
-      },
-      {
-        id: "2",
-        text: "I'm good Mom, just busy with work",
-        sender: "me",
-        timestamp: "Monday",
-        status: "read",
-      },
-      {
-        id: "3",
-        text: "Call me when you're free",
-        sender: "them",
-        timestamp: "Monday",
-        status: "read",
-      },
-    ],
-    "5": [
-      {
-        id: "1",
-        text: "Team meeting at 3pm today",
-        sender: "them",
-        timestamp: "Monday",
-        status: "read",
-        senderName: "Boss",
-      },
-      {
-        id: "2",
-        text: "I'll be there",
-        sender: "me",
-        timestamp: "Monday",
-        status: "read",
-      },
-      {
-        id: "3",
-        text: "Don't forget the meeting at 3",
-        sender: "them",
-        timestamp: "Monday",
-        status: "read",
-        senderName: "Boss",
+        body: "Hey, how are you?",
+        from: "them",
+        timestamp: new Date().toLocaleString(),
+        to: "John",
       },
     ],
   });
 
-  const handleSelectConversation = (conversation: Conversation) => {
+  const handleSelectConversation = (conversation: XMPPContact) => {
     setActiveConversation(conversation);
     if (isMobile) {
       setShowConversations(false);
@@ -214,15 +52,19 @@ export default function ChatInterface() {
     setShowConversations(true);
   };
 
+  // TODO: TO is missing
+  // TODO: Current User that is logged in
   const handleSendMessage = (text: string) => {
     if (!activeConversation) return;
 
-    const newMessage: Message = {
+    // await sendMessage(to: string, body: string)
+    const newMessage: XMPPMessage = {
       id: Date.now().toString(),
-      text,
-      sender: "me",
-      timestamp: "Just now",
-      status: "sent",
+      body: text,
+      from: "me", // current user
+      timestamp: new Date().toLocaleString(),
+      to: "", // to user
+      //status: "sent",
     };
 
     setMessages((prev) => ({
@@ -250,12 +92,14 @@ export default function ChatInterface() {
     }
   };
 
-  const handleAddContact = (contactData: Omit<Conversation, "id">) => {
+  const handleAddContact = (contactData: Omit<XMPPContact, "id">) => {
     // Generate a unique ID for the new contact
     const newId = (conversations.length + 1).toString();
 
+    // TODO: public async addToRoster(jid: string, name?: string)
+
     // Create the new contact with the generated ID
-    const newContact: Conversation = {
+    const newContact: XMPPContact = {
       id: newId,
       ...contactData,
     };

@@ -4,9 +4,7 @@ import type React from "react";
 
 import { useState } from "react";
 
-import { AlertCircle } from "lucide-react";
 import { useAuth } from "LA/app/lib/auth-context";
-import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";

@@ -4,15 +4,15 @@ import type React from "react";
 
 import { useState } from "react";
 import { ArrowLeft, Paperclip, Mic, Send, X } from "lucide-react";
-import { type Conversation, type Message } from "../lib/types";
 import { Button } from "LA/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "LA/components/ui/avatar";
 import MessageBubble from "./message-bubble";
 import { Input } from "LA/components/ui/input";
+import { type XMPPContact, type XMPPMessage } from "../lib/xmppClient";
 
 interface ChatWindowProps {
-  conversation: Conversation;
-  messages: Message[];
+  conversation: XMPPContact;
+  messages: XMPPMessage[];
   onSendMessage: (text: string) => void;
   onBack?: () => void;
   onClose: () => void;
@@ -30,6 +30,9 @@ export default function ChatWindow({
   const handleSend = () => {
     if (messageText.trim()) {
       onSendMessage(messageText.trim());
+
+
+
       setMessageText("");
     }
   };
@@ -59,7 +62,7 @@ export default function ChatWindow({
             {conversation.name}
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {conversation.online ? "Online" : "Last seen recently"}
+            {conversation.status ? "Online" : "Last seen recently"}
           </p>
         </div>
         <Button
@@ -86,7 +89,7 @@ export default function ChatWindow({
             <MessageBubble
               key={message.id}
               message={message}
-              isGroup={conversation.isGroup}
+              // isGroup={conversation.isGroup}
             />
           ))}
         </div>
