@@ -16,6 +16,9 @@ export default function ChatInterface() {
   const { user, logout } = useAuth();
   const { sendMessage, addContact, contacts, messages } = useXmpp();
 
+  console.log("Messages:", messages);
+  console.log("activeConversations", activeConversation);
+
   const handleSelectConversation = (conversation: XMPPContact) => {
     setActiveConversation(conversation);
     if (isMobile) {
@@ -79,7 +82,7 @@ export default function ChatInterface() {
           {activeConversation ? (
             <ChatWindow
               conversation={activeConversation}
-              messages={messages[activeConversation.id] ?? []}
+              messages={messages[activeConversation.jid] ?? []}
               onSendMessage={handleSendMessage}
               onBack={isMobile ? handleBackToList : undefined}
               onClose={handleCloseChat}

@@ -31,8 +31,6 @@ export default function ChatWindow({
     if (messageText.trim()) {
       onSendMessage(messageText.trim());
 
-
-
       setMessageText("");
     }
   };
@@ -43,6 +41,8 @@ export default function ChatWindow({
       handleSend();
     }
   };
+
+  console.log("Messages in Chat-window", messages);
 
   return (
     <div className="flex h-full flex-col">
