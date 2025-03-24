@@ -65,32 +65,27 @@ class XMPPClient extends EventEmitter {
         password: password,
       });
 
+      // Create a promise that resolves when we receive the roster
+      const rosterPromise = new Promise<void>((resolve) => {
+        const rosterHandler = (stanza: XmlElement) => {
+          if (stanza.is("iq") && stanza.attrs.type === "result") {
+            const query = stanza.getChild("query", "jabber:iq:roster");
+            if (query) {
+              this.xmppClient?.off("stanza", rosterHandler);
+              resolve();
+            }
+          }
+        };
+        this.xmppClient?.on("stanza", rosterHandler);
+      });
+
       // Set up event handlers
       this.xmppClient.on("online", (data) => {
         console.log("data: ", data);
         console.log("Connected as", username);
         this.connected = true;
         this.currentUser = username!;
-
         console.log("currentUser: ", this.currentUser);
-
-        // Handle async operations
-        void (async () => {
-          // Send initial presence
-          await this.xmppClient?.send(xml("presence"));
-
-          // Request roster (contact list)
-          await this.xmppClient?.send(
-            xml(
-              "iq",
-              { type: "get", id: "roster_1" },
-              xml("query", { xmlns: "jabber:iq:roster" }),
-            ),
-          );
-
-          // No need for key pair generation anymore
-          this.emit("connected", { jid });
-        })();
       });
 
       this.xmppClient.on("error", (err: Error) => {
@@ -120,8 +115,26 @@ class XMPPClient extends EventEmitter {
         );
       });
 
+      // Wait for connection
       await Promise.race([connectionPromise, timeoutPromise]);
-      return this.connected; // Return the actual connected state instead of just true
+
+      // Now that we're connected, send presence and request roster
+      await this.xmppClient.send(xml("presence"));
+      await this.xmppClient.send(
+        xml(
+          "iq",
+          { type: "get", id: "roster_1" },
+          xml("query", { xmlns: "jabber:iq:roster" }),
+        ),
+      );
+
+      // Wait for roster to be received
+      await rosterPromise;
+
+      // Emit connected event after roster is loaded
+      this.emit("connected", { jid });
+
+      return this.connected;
     } catch (error) {
       console.error("Error connecting to XMPP server:", error);
 
