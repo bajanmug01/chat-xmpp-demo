@@ -1,8 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, type ReactNode } from "react"
-import { xmppClient } from "./xmppClient"
 import { api } from "LA/trpc/react"
+import { useXmpp } from "../hooks/useXmpp"
 
 export type User = {
   id: string
@@ -22,6 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { client } = useXmpp();
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const registerMutation = api.xmpp.registerUser.useMutation()
@@ -31,12 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
 
     try {
-      // Connect to XMPP server
-      const success = await xmppClient.connect(email, password)
+      // Connect to XMPP server with credentials
+      const success = await client.connect(email, password)
       
       if (success) {
         const newUser = {
-          id: email, // Using email as ID since it's unique
+          id: email,
           name: email.split("@")[0] ?? email,
           email,
           avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(email.charAt(0).toUpperCase())}`,
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Logout function
   const logout = async () => {
-    await xmppClient.disconnect()
+    await client.disconnect()
     setUser(null)
   }
 

@@ -3,6 +3,7 @@
 import { EventEmitter } from "events";
 import { client, xml, type XmppClient, type XmlElement } from "@xmpp/client";
 import { env } from "LA/env";
+import { Contact } from "lucide-react";
 
 // Types for XMPP messages and contacts
 export type XMPPMessage = {
@@ -52,10 +53,7 @@ class XMPPClient extends EventEmitter {
    */
   public async connect(jid: string, password: string): Promise<boolean> {
     try {
-
-      const username = jid.includes("@")
-      ? jid.split("@")[0]
-      : jid;
+      const username = jid.includes("@") ? jid.split("@")[0] : jid;
       // Create XMPP client with environment variables
       console.log("username: ", username);
       console.log("password: ", password);
@@ -115,21 +113,27 @@ class XMPPClient extends EventEmitter {
       // Start the connection with a timeout
       const connectionPromise = this.xmppClient.start();
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Connection timeout after 15 seconds")), 15000);
+        setTimeout(
+          () => reject(new Error("Connection timeout after 15 seconds")),
+          15000,
+        );
       });
 
       await Promise.race([connectionPromise, timeoutPromise]);
       return this.connected; // Return the actual connected state instead of just true
     } catch (error) {
       console.error("Error connecting to XMPP server:", error);
-      
+
       // Make sure we emit the error
       if (error instanceof Error) {
         this.emit("error", error);
       } else {
-        this.emit("error", new Error("Unknown error connecting to XMPP server"));
+        this.emit(
+          "error",
+          new Error("Unknown error connecting to XMPP server"),
+        );
       }
-      
+
       this.connected = false;
       this.currentUser = null;
       return false;
@@ -221,7 +225,7 @@ class XMPPClient extends EventEmitter {
     // Update contact's last message time
     const contact = this.contacts.find((c) => c.id === contactId);
     if (contact) {
-      contact.lastMessageTime = new Date().toISOString();
+      contact.lastMessageTime = new Date().toLocaleString();
     }
 
     // Emit message event
@@ -446,14 +450,21 @@ class XMPPClient extends EventEmitter {
   /**
    * Add a contact to the roster
    */
-  public async addToRoster(jid: string, name?: string): Promise<{ success: boolean; error?: string }> {
+  public async addToRoster(
+    jid: string,
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.connected || !this.xmppClient) {
       throw new Error("Cannot add contact: not connected");
     }
 
+    const username = jid.includes("@") ? jid.split("@")[0] : jid;
+    const domainJid = `${username}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`;
+
+    console.log("add username: ", username);
+
     try {
       // TODO: Check if user exists
-      
+
       // Send roster set IQ stanza
       const rosterSetId = `roster_set_${Math.random().toString(36).substring(2, 15)}`;
 
@@ -464,21 +475,21 @@ class XMPPClient extends EventEmitter {
           xml(
             "query",
             { xmlns: "jabber:iq:roster" },
-            xml("item", { jid, name: name ?? jid.split("@")[0] ?? jid }),
+            xml("item", { jid: domainJid, name: username! }),
           ),
         ),
       );
 
       // Send subscription request
       await this.xmppClient.send(
-        xml("presence", { to: jid, type: "subscribe" }),
+        xml("presence", { to: domainJid, type: "subscribe" }),
       );
 
       // Create a local contact if it doesn't exist yet
-      const existingContact = this.contacts.find((c) => c.jid === jid);
+      const existingContact = this.contacts.find((c) => c.jid === domainJid);
       if (!existingContact) {
         const contactId = Math.random().toString(36).substring(2, 15);
-        const displayName = name ?? jid.split("@")[0] ?? jid;
+        const displayName = username!;
 
         const contact: XMPPContact = {
           id: contactId,
@@ -492,10 +503,14 @@ class XMPPClient extends EventEmitter {
         this.contacts.push(contact);
         this.emit("contactsUpdated", this.contacts);
       }
+      console.log("added contact to roster: ", Contact.name);
 
       return { success: true };
     } catch (error) {
-      console.error("Error adding contact to roster:", error instanceof Error ? error.message : error);
+      console.error(
+        "Error adding contact to roster:",
+        error instanceof Error ? error.message : error,
+      );
       return { success: false, error: "Error adding contact" };
     }
   }

@@ -1,6 +1,5 @@
-import { Check, CheckCheck } from "lucide-react";
 import { cn } from "LA/lib/utils";
-import { XMPPMessage } from "../lib/xmppClient";
+import { type XMPPMessage } from "../lib/xmppClient";
 
 interface MessageBubbleProps {
   message: XMPPMessage;

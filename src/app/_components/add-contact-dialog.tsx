@@ -15,7 +15,8 @@ import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
-import { type XMPPContact } from "../lib/xmppClient";
+import { xmppClient, type XMPPContact } from "../lib/xmppClient";
+import { useXmpp } from "../hooks/useXmpp";
 
 interface AddContactDialogProps {
   open: boolean;
@@ -28,11 +29,12 @@ export function AddContactDialog({
   onOpenChange,
   onAddContact,
 }: AddContactDialogProps) {
+  const { client, isConnected } = useXmpp();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -41,27 +43,38 @@ export function AddContactDialog({
       return;
     }
 
+    if (!isConnected) {
+      setError("Not connected to XMPP server");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    //TODO:  public async addToRoster(jid: string, name?: string): 
+    try {
+      await client.addToRoster(name);
 
-    // Create a new contact
-    const newContact: Omit<XMPPContact, "id"> = {
-      jid: name,
-      name: name.trim(),
-      avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.charAt(0))}`,
-      lastMessageTime: "Just now",
-      unreadCount: 0,
-      status: "online",
-    };
+      // Create a new contact
+      const newContact: Omit<XMPPContact, "id"> = {
+        jid: name,
+        name: name.trim(),
+        avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.charAt(0))}`,
+        lastMessageTime: new Date().toISOString(),
+        unreadCount: 0,
+        status: "online",
+      };
 
-    // Add the contact
-    onAddContact(newContact);
+      // Add the contact
+      onAddContact(newContact);
 
-    // Reset form and close dialog
-    setName("");
-    setIsSubmitting(false);
-    onOpenChange(false);
+      // Reset form and close dialog
+      setName("");
+      onOpenChange(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to add contact";
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
