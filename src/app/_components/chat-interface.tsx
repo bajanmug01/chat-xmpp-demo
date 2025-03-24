@@ -1,198 +1,319 @@
 "use client";
 
-import type React from "react";
-import Image from "next/image";
+import { useState } from "react";
+import { useMediaQuery } from "../hooks/use-media-query";
+import { Conversation, Message } from "../lib/types";
+import { useAuth } from "../lib/auth-context";
+import ConversationList from "./conversation-list";
+import ChatWindow from "./chat-window";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, ArrowLeft, X } from "lucide-react";
-import { type Contact, type Message, type User } from "../lib/types";
-import { Button } from "LA/components/ui/button";
-import { Input } from "LA/components/ui/input";
+export default function ChatInterface() {
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
+  const [showConversations, setShowConversations] = useState(true);
+  const { user, logout } = useAuth();
 
-interface ChatInterfaceProps {
-  contact: Contact;
-  user: User;
-  messages: Message[];
-  onSendMessage: (content: string) => void;
-  onBack?: () => void;
-  onClose?: () => void;
-  isMobile?: boolean;
-  compact?: boolean;
-}
+  // Sample data
+  const [conversations, setConversations] = useState<Conversation[]>([
+    {
+      id: "1",
+      name: "John Doe",
+      avatar: "/placeholder.svg?height=40&width=40",
+      lastMessage: "Hey, how are you?",
+      timestamp: "10:30 AM",
+      unread: 2,
+      online: true,
+    },
+    {
+      id: "2",
+      name: "Jane Smith",
+      avatar: "/placeholder.svg?height=40&width=40",
+      lastMessage: "Can we meet tomorrow?",
+      timestamp: "Yesterday",
+      unread: 0,
+      online: false,
+    },
+    {
+      id: "3",
+      name: "Tech Group",
+      avatar: "/placeholder.svg?height=40&width=40",
+      lastMessage: "Alice: Check out this new framework!",
+      timestamp: "Yesterday",
+      unread: 5,
+      online: false,
+      isGroup: true,
+    },
+    {
+      id: "4",
+      name: "Mom",
+      avatar: "/placeholder.svg?height=40&width=40",
+      lastMessage: "Call me when you're free",
+      timestamp: "Monday",
+      unread: 0,
+      online: true,
+    },
+    {
+      id: "5",
+      name: "Work Team",
+      avatar: "/placeholder.svg?height=40&width=40",
+      lastMessage: "Boss: Don't forget the meeting at 3",
+      timestamp: "Monday",
+      unread: 0,
+      online: false,
+      isGroup: true,
+    },
+  ]);
 
-export function ChatInterface({
-  contact,
-  user,
-  messages,
-  onSendMessage,
-  onBack,
-  onClose,
-  isMobile = false,
-  compact = false,
-}: ChatInterfaceProps) {
-  const [newMessage, setNewMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Record<string, Message[]>>({
+    "1": [
+      {
+        id: "1",
+        text: "Hey, how are you?",
+        sender: "them",
+        timestamp: "10:30 AM",
+        status: "read",
+      },
+      {
+        id: "2",
+        text: "I'm good, thanks! How about you?",
+        sender: "me",
+        timestamp: "10:31 AM",
+        status: "read",
+      },
+      {
+        id: "3",
+        text: "Doing well. Any plans for the weekend?",
+        sender: "them",
+        timestamp: "10:32 AM",
+        status: "read",
+      },
+    ],
+    "2": [
+      {
+        id: "1",
+        text: "Hi Jane, do you have time to meet?",
+        sender: "me",
+        timestamp: "Yesterday",
+        status: "read",
+      },
+      {
+        id: "2",
+        text: "Sure, what's it about?",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "read",
+      },
+      {
+        id: "3",
+        text: "Can we meet tomorrow?",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "delivered",
+      },
+    ],
+    "3": [
+      {
+        id: "1",
+        text: "Welcome to the Tech Group!",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "read",
+        senderName: "Admin",
+      },
+      {
+        id: "2",
+        text: "Thanks for adding me!",
+        sender: "me",
+        timestamp: "Yesterday",
+        status: "read",
+      },
+      {
+        id: "3",
+        text: "Has anyone tried the new React 18?",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "read",
+        senderName: "Bob",
+      },
+      {
+        id: "4",
+        text: "Yes, the concurrent features are amazing!",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "read",
+        senderName: "Alice",
+      },
+      {
+        id: "5",
+        text: "Check out this new framework!",
+        sender: "them",
+        timestamp: "Yesterday",
+        status: "delivered",
+        senderName: "Alice",
+      },
+    ],
+    "4": [
+      {
+        id: "1",
+        text: "Hi sweetie, how are you doing?",
+        sender: "them",
+        timestamp: "Monday",
+        status: "read",
+      },
+      {
+        id: "2",
+        text: "I'm good Mom, just busy with work",
+        sender: "me",
+        timestamp: "Monday",
+        status: "read",
+      },
+      {
+        id: "3",
+        text: "Call me when you're free",
+        sender: "them",
+        timestamp: "Monday",
+        status: "read",
+      },
+    ],
+    "5": [
+      {
+        id: "1",
+        text: "Team meeting at 3pm today",
+        sender: "them",
+        timestamp: "Monday",
+        status: "read",
+        senderName: "Boss",
+      },
+      {
+        id: "2",
+        text: "I'll be there",
+        sender: "me",
+        timestamp: "Monday",
+        status: "read",
+      },
+      {
+        id: "3",
+        text: "Don't forget the meeting at 3",
+        sender: "them",
+        timestamp: "Monday",
+        status: "read",
+        senderName: "Boss",
+      },
+    ],
+  });
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim()) {
-      onSendMessage(newMessage);
-      setNewMessage("");
+  const handleSelectConversation = (conversation: Conversation) => {
+    setActiveConversation(conversation);
+    if (isMobile) {
+      setShowConversations(false);
     }
   };
 
+  const handleBackToList = () => {
+    setShowConversations(true);
+  };
+
+  const handleSendMessage = (text: string) => {
+    if (!activeConversation) return;
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text,
+      sender: "me",
+      timestamp: "Just now",
+      status: "sent",
+    };
+
+    setMessages((prev) => ({
+      ...prev,
+      [activeConversation.id]: [
+        ...(prev[activeConversation.id] ?? []),
+        newMessage,
+      ],
+    }));
+
+    // Update last message in conversation list
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === activeConversation.id
+          ? { ...conv, lastMessage: text, timestamp: "Just now", unread: 0 }
+          : conv,
+      ),
+    );
+  };
+
+  const handleCloseChat = () => {
+    setActiveConversation(null);
+    if (isMobile) {
+      setShowConversations(true);
+    }
+  };
+
+  const handleAddContact = (contactData: Omit<Conversation, "id">) => {
+    // Generate a unique ID for the new contact
+    const newId = (conversations.length + 1).toString();
+
+    // Create the new contact with the generated ID
+    const newContact: Conversation = {
+      id: newId,
+      ...contactData,
+    };
+
+    // Add the new contact to the conversations list
+    setConversations((prev) => [...prev, newContact]);
+
+    // Initialize empty messages array for the new contact
+    setMessages((prev) => ({
+      ...prev,
+      [newId]: [],
+    }));
+
+    // Open the chat with the new contact
+    setActiveConversation(newContact);
+    if (isMobile) {
+      setShowConversations(false);
+    }
+  };
+
+  if (!user) return null;
+
   return (
-    <div className="flex h-full flex-col bg-white">
-      {/* Chat header */}
-      {!compact && (
-        <div className="flex items-center justify-between border-b border-gray-200 p-4">
-          <div className="flex items-center">
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="mr-2"
-                onClick={onBack}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            )}
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Image
-                  src={contact.avatar || "/placeholder.svg"}
-                  alt={contact.name}
-                  width={40}
-                  height={40}
-                  className="rounded-full"
-                />
-                <div
-                  className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                    contact.isOnline ? "bg-green-500" : "bg-gray-400"
-                  }`}
-                ></div>
-              </div>
-              <div>
-                <div className="font-medium">{contact.name}</div>
-                <div className="text-sm text-gray-500">
-                  {contact.isOnline
-                    ? "Online"
-                    : `Last seen ${new Date(contact.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-                </div>
-              </div>
-            </div>
-          </div>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Compact header */}
-      {compact && (
-        <div className="flex items-center justify-between border-b border-gray-200 p-2">
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <Image
-                src={contact.avatar || "/placeholder.svg"}
-                alt={contact.name}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
-              <div
-                className={`absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-white ${
-                  contact.isOnline ? "bg-green-500" : "bg-gray-400"
-                }`}
-              ></div>
-            </div>
-            <div className="text-sm font-medium">{contact.name}</div>
-          </div>
-          {onClose && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={onClose}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Messages area */}
-      <div
-        className={`flex-1 ${compact ? "p-2" : "p-4"} overflow-y-auto bg-gray-50`}
-      >
-        {messages.length > 0 ? (
-          <div className={`space-y-${compact ? "2" : "4"}`}>
-            {messages.map((message) => {
-              const isOwnMessage = message.senderId === user.id;
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] ${compact ? "p-2 text-sm" : "p-3"} rounded-lg ${
-                      isOwnMessage
-                        ? "rounded-br-none bg-blue-500 text-white"
-                        : "rounded-bl-none bg-gray-200 text-gray-800"
-                    }`}
-                  >
-                    <div>{message.content}</div>
-                    <div
-                      className={`${compact ? "text-[10px]" : "text-xs"} mt-1 ${
-                        isOwnMessage ? "text-blue-100" : "text-gray-500"
-                      }`}
-                    >
-                      {new Date(message.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center text-gray-500">
-            <span className={compact ? "text-sm" : ""}>No messages yet</span>
-          </div>
-        )}
-      </div>
-
-      {/* Message input */}
-      <form
-        onSubmit={handleSubmit}
-        className={`${compact ? "p-2" : "p-4"} border-t border-gray-200`}
-      >
-        <div className="flex space-x-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className={`flex-1 ${compact ? "h-8 py-1 text-sm" : ""}`}
+    <div className="flex h-screen bg-white dark:bg-gray-900">
+      {/* Conversations sidebar */}
+      {(showConversations || !isMobile) && (
+        <div
+          className={`${isMobile ? "w-full" : "w-1/3 border-r"} dark:border-gray-800`}
+        >
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConversation?.id}
+            onSelectConversation={handleSelectConversation}
+            onLogout={logout}
+            onAddContact={handleAddContact}
+            currentUser={user}
           />
-          <Button
-            type="submit"
-            size={compact ? "sm" : "icon"}
-            className={compact ? "h-8 w-8 p-0" : ""}
-          >
-            <Send className={compact ? "h-3 w-3" : "h-4 w-4"} />
-          </Button>
         </div>
-      </form>
+      )}
+
+      {/* Chat window */}
+      {(!showConversations || !isMobile) && (
+        <div className={`${isMobile ? "w-full" : "w-2/3"} flex flex-col`}>
+          {activeConversation ? (
+            <ChatWindow
+              conversation={activeConversation}
+              messages={messages[activeConversation.id] ?? []}
+              onSendMessage={handleSendMessage}
+              onBack={isMobile ? handleBackToList : undefined}
+              onClose={handleCloseChat}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
+              Select a conversation to start chatting
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

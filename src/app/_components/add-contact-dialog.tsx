@@ -1,98 +1,106 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "LA/components/ui/dialog"
-import { Label } from "LA/components/ui/label"
-import { Button } from "LA/components/ui/button"
-import { Input } from "LA/components/ui/input"
-import { env } from "LA/env"
-import { type Contact } from "./contact-list"
+import { useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { type Conversation } from "../lib/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "LA/components/ui/dialog";
+import { Alert, AlertDescription } from "LA/components/ui/alert";
+import { Label } from "LA/components/ui/label";
+import { Input } from "LA/components/ui/input";
+import { Button } from "LA/components/ui/button";
 
 interface AddContactDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onAddContact: (contact: Contact) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddContact: (contact: Omit<Conversation, "id">) => void;
 }
 
-export function AddContactDialog({ open, onOpenChange, onAddContact }: AddContactDialogProps) {
-  const [username, setUsername] = useState("")
-  const [displayName, setDisplayName] = useState("")
-  const [error, setError] = useState("")
+export function AddContactDialog({
+  open,
+  onOpenChange,
+  onAddContact,
+}: AddContactDialogProps) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+    setError("");
 
-    if (!username.trim()) {
-      setError("Please enter a contact username")
-      return
+    if (!name.trim()) {
+      setError("Contact name is required");
+      return;
     }
 
-    // Clean up the username - if it includes @domain, use as is, otherwise add domain
-    const domain = env.NEXT_PUBLIC_XMPP_DOMAIN
-    const jid = username.includes('@') ? username : `${username}@${domain}`
+    setIsSubmitting(true);
 
     // Create a new contact
-    const newContact: Contact = {
-      id: jid, // Use the full JID as the ID
-      name: displayName.trim() || username.trim(), // Use display name if provided, otherwise username
-      lastSeen: new Date(),
-      isOnline: false,
-      avatar: "/placeholder.svg?height=40&width=40",
-    }
+    const newContact: Omit<Conversation, "id"> = {
+      name: name.trim(),
+      avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.charAt(0))}`,
+      lastMessage: "",
+      timestamp: "Just now",
+      unread: 0,
+      online: false,
+    };
 
-    onAddContact(newContact)
-    setUsername("")
-    setDisplayName("")
-    setError("")
-  }
+    // Add the contact
+    onAddContact(newContact);
 
-  const handleCancel = () => {
-    // Clear form and close
-    setUsername("")
-    setDisplayName("")
-    setError("")
-    onOpenChange(false)
-  }
+    // Reset form and close dialog
+    setName("");
+    setIsSubmitting(false);
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Contact</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="contact-username">Username or JID</Label>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="contact-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username or full JID"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter contact name"
+                autoComplete="off"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-display-name">Display Name (optional)</Label>
-              <Input
-                id="contact-display-name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter display name for this contact"
-              />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCancel}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit">Add Contact</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Contact"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-
