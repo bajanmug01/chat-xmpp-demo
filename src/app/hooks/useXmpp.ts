@@ -8,18 +8,29 @@ import {
 export function useXmpp() {
   const [isConnected, setIsConnected] = useState(xmppClient.isConnected());
   const [error, setError] = useState<string | null>(null);
-  const [contacts, setContacts] = useState<XMPPContact[]>(
-    xmppClient.getContacts(),
-  );
+  const [contacts, setContacts] = useState<XMPPContact[]>([]);
   const [messages, setMessages] = useState<Record<string, XMPPMessage[]>>({});
 
   useEffect(() => {
-    // Initialize state with current client state
-    setIsConnected(xmppClient.isConnected());
-    setContacts(xmppClient.getContacts());
+    // Only initialize state if connected
+    if (xmppClient.isConnected()) {
+      setContacts(xmppClient.getContacts());
+    } else {
+      setContacts([]);
+      setMessages({});
+    }
 
-    const handleConnect = () => setIsConnected(true);
-    const handleDisconnect = () => setIsConnected(false);
+    const handleConnect = () => {
+      setIsConnected(true);
+      setContacts(xmppClient.getContacts());
+    };
+    
+    const handleDisconnect = () => {
+      setIsConnected(false);
+      setContacts([]);
+      setMessages({});
+    };
+
     const handleError = (err: Error) => setError(err.message);
     const handleContactsUpdate = (newContacts: XMPPContact[]) =>
       setContacts(newContacts);
@@ -40,7 +51,6 @@ export function useXmpp() {
     xmppClient.on("contactsUpdated", handleContactsUpdate);
     xmppClient.on("message", handleMessage);
 
-    // Cleanup subscriptions
     return () => {
       xmppClient.off("connected", handleConnect);
       xmppClient.off("disconnected", handleDisconnect);
@@ -99,13 +109,10 @@ export function useXmpp() {
     error,
     contacts,
     messages,
-    // Exposed functions
     addContact,
     sendMessage,
     markAsRead,
     updatePresence,
-    // Expose original client methods if needed
-    getContacts: () => xmppClient.getContacts(),
-    getMessages: (contactId: string) => xmppClient.getMessages(contactId),
+    //getMessages: (contactId: string) => xmppClient.getMessages(contactId),
   };
 }

@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
-import { xmppClient, type XMPPContact } from "../lib/xmppClient";
+import { type XMPPContact } from "../lib/xmppClient";
 import { useXmpp } from "../hooks/useXmpp";
 
 interface AddContactDialogProps {

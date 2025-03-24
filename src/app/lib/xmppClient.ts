@@ -67,7 +67,8 @@ class XMPPClient extends EventEmitter {
 
       // Set up event handlers
       this.xmppClient.on("online", (data) => {
-        console.log("Connected as", data.jid?.toString());
+        console.log("data: ", data);
+        console.log("Connected as", username);
         this.connected = true;
         this.currentUser = username!;
 
@@ -115,7 +116,7 @@ class XMPPClient extends EventEmitter {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error("Connection timeout after 15 seconds")),
-          15000,
+          10000,
         );
       });
 
@@ -150,8 +151,15 @@ class XMPPClient extends EventEmitter {
 
       // Stop the client
       await this.xmppClient.stop();
+      
+      // Clear all state
       this.connected = false;
       this.currentUser = null;
+      this.contacts = [];  // Clear contacts
+      this.messages = {};  // Clear messages
+      
+      // Emit events to update UI
+      this.emit("contactsUpdated", []);
     }
   }
 
@@ -464,6 +472,17 @@ class XMPPClient extends EventEmitter {
 
     try {
       // TODO: Check if user exists
+      /*
+      // Send a message and wait a few seconds for error
+await xmppClient.send(xml("message", { to: domainJid, type: "chat" }, xml("body", {}, "ping")));
+
+// Wait and listen for error stanza
+client.on("stanza", stanza => {
+  if (stanza.is("message") && stanza.attrs.type === "error") {
+    console.log("Probably doesn't exist!");
+  }
+});
+      */
 
       // Send roster set IQ stanza
       const rosterSetId = `roster_set_${Math.random().toString(36).substring(2, 15)}`;
