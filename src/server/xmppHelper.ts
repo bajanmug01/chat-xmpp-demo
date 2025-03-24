@@ -24,9 +24,15 @@ export async function createUser({
   if (!domain) {
     throw new Error("NEXT_PUBLIC_XMPP_DOMAIN environment variable is not set");
   }
+  // in a real application it should be handeled different
+  const username = newUser.includes("@")
+  ? newUser.split("@")[0]
+  : newUser;
+
+  const jid = username;
 
   console.log(
-    `Attempting to register user ${newUser}@${domain} via WebSocket...`,
+    `Attempting to register user ${jid} via WebSocket...`,
   );
 
   return new Promise<void>((resolve, reject) => {
@@ -202,7 +208,7 @@ export async function createUser({
         );
 
         // For servers that use data forms
-        const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
+        const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${jid}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
 
         console.log("Sending data form registration");
         try {
@@ -223,7 +229,7 @@ export async function createUser({
         );
 
         // Send basic registration data
-        const registration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><username>${newUser}</username><password>${newPass}</password></query></iq>`;
+        const registration = `<iq type="set" id="${stanzaId}-reg2" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><username>${jid}</username><password>${newPass}</password></query></iq>`;
         console.log("Sending registration data");
 
         try {
@@ -246,7 +252,7 @@ export async function createUser({
         );
 
         // Success!
-        console.log(`✅ User ${newUser}@${domain} successfully registered!`);
+        console.log(`✅ User ${jid} successfully registered!`);
         registrationComplete = true;
 
         // Send proper stream close
@@ -268,14 +274,14 @@ export async function createUser({
             void (async () => {
               try {
                 console.log(
-                  `Verifying registration by authenticating as ${newUser}...`,
+                  `Verifying registration by authenticating as ${jid}...`,
                 );
 
                 // Create an XMPP client to verify authentication
                 const verifyClient = client({
                   service: serviceUrl,
                   domain,
-                  username: newUser,
+                  username: jid,
                   password: newPass,
                   resource: "registrationverify",
                 });
@@ -284,7 +290,7 @@ export async function createUser({
 
                 verifyClient.on("online", () => {
                   console.log(
-                    `✅ Authentication successful! User ${newUser} was created properly.`,
+                    `✅ Authentication successful! User ${jid} was created properly.`,
                   );
                   authSuccess = true;
                   void verifyClient.stop();
@@ -347,9 +353,9 @@ export async function createUser({
 
         // Check for user already exists error (conflict)
         if (data.includes('<conflict') || errorMessage.toLowerCase().includes('already exists')) {
-          console.error(`User ${newUser}@${domain} already exists`);
+          console.error(`User ${jid} already exists`);
           cleanup();
-          return reject(new Error(`User already exists: ${newUser}@${domain}`));
+          return reject(new Error(`User already exists: ${jid}`));
         }
         
         // Check for other specific error types
@@ -375,7 +381,7 @@ export async function createUser({
             "Attempting alternative registration method with data form...",
           );
 
-          const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg3" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${newUser}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
+          const dataFormRegistration = `<iq type="set" id="${stanzaId}-reg3" to="${domain}" xmlns="jabber:client"><query xmlns="jabber:iq:register"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>jabber:iq:register</value></field><field var="username"><value>${jid}</value></field><field var="password"><value>${newPass}</value></field></x></query></iq>`;
 
           console.log("Sending data form registration");
           try {

@@ -10,37 +10,37 @@ import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
+import toast from "react-hot-toast";
 
 export function LoginForm() {
-  const { login, isLoading } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setIsLoading(true);
 
-    if (!email || !password) {
-      setError("Please fill in all fields");
-      return;
-    }
+    try {
+      if (!email || !password) {
+        throw new Error("Please fill in all fields");
+      }
 
-    const success = await login(email, password);
-    if (!success) {
-      setError("Invalid email or password");
+      const success = await login(email, password);
+      if (!success) {
+        throw new Error("Invalid email or password");
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast.error(errorMessage, { duration: 4000 });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -50,6 +50,7 @@ export function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          disabled={isLoading}
         />
       </div>
 
@@ -62,11 +63,19 @@ export function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          disabled={isLoading}
         />
       </div>
 
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Logging in..." : "Log in"}
+        {isLoading ? (
+          <>
+            <span className="loading loading-spinner"></span>
+            Logging in...
+          </>
+        ) : (
+          "Log in"
+        )}
       </Button>
     </form>
   );

@@ -51,23 +51,26 @@ class XMPPClient extends EventEmitter {
    */
   public async connect(jid: string, password: string): Promise<boolean> {
     try {
+
+      const username = jid.includes("@")
+      ? jid.split("@")[0]
+      : jid;
       // Create XMPP client with environment variables
-      console.log("jid: ", jid);
+      console.log("username: ", username);
       console.log("password: ", password);
 
       this.xmppClient = client({
         service: env.NEXT_PUBLIC_XMPP_SERVICE,
         domain: env.NEXT_PUBLIC_XMPP_DOMAIN,
-        username: jid,
+        username: username,
         password: password,
       });
 
-      console.log("client: ", this.xmppClient);
       // Set up event handlers
       this.xmppClient.on("online", (data) => {
-        console.log("Connected as", data.jid?.toString()); // Somehow undefined
+        console.log("Connected as", data.jid?.toString());
         this.connected = true;
-        this.currentUser = jid;
+        this.currentUser = username!;
 
         console.log("currentUser: ", this.currentUser);
 
