@@ -1,29 +1,66 @@
-# Create T3 App
+# XMPP Chat Application
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+This is a simple XMPP chat application built with the [T3 Stack](https://create.t3.gg/). It provides real-time messaging capabilities using XMPP protocol.
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- Real-time messaging using XMPP
+- Contact management (roster)
+- Message history
+- Presence status (online, offline, away)
+- Modern UI with Tailwind CSS
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Tech Stack
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+This project uses the following technologies:
+
+- [Next.js](https://nextjs.org) - React framework
+- [XMPP.js](https://github.com/xmppjs/xmpp.js) - XMPP client library
+- [Tailwind CSS](https://tailwindcss.com) - Styling
+- [tRPC](https://trpc.io) - API layer
+- [T3 Stack](https://create.t3.gg/) - Full-stack framework
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up your environment variables:
+   ```env
+   NEXT_PUBLIC_XMPP_SERVICE=
+   NEXT_PUBLIC_XMPP_DOMAIN=
+   ```
+4. Run the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+5. The application will be available at `http://localhost:3000`
+
+6. Make sure you have Docker and Docker Compose installed
+7. Run the following command to start the xmppServer in a docker container:
+   ```bash
+   docker compose up
+   ```
+
+To stop the container:
+
+```bash
+docker compose down
+```
 
 ## Learn More
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+To learn more about the technologies used in this project:
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+- [XMPP.js Documentation](https://github.com/xmppjs/xmpp.js)
+- [T3 Stack Documentation](https://create.t3.gg/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
-
-## How do I deploy this?
+## Deployment
 
 Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
