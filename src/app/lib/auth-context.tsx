@@ -23,7 +23,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { client } = useXmpp();
+  const { connect, disconnect } = useXmpp();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const registerMutation = api.xmpp.registerUser.useMutation();
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       // Connect to XMPP server with credentials
-      const success = await client.connect(email, password);
+      const success = await connect(email, password);
 
       const username = email.split("@")[0] ?? email;
 
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Logout function
   const logout = async (): Promise<boolean> => {
-    await client.disconnect();
+    await disconnect();
     setUser(null);
     return true;
   };

@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  xmppClient,
-} from "../lib/xmppClient";
+import { xmppClient } from "../lib/xmppClient";
 
 export function useXmpp() {
   const [isConnected, setIsConnected] = useState(xmppClient.isConnected());
@@ -11,18 +9,18 @@ export function useXmpp() {
   useEffect(() => {
     const handleConnect = () => {
       setIsConnected(true);
-      setUpdateTrigger(prev => prev + 1);
+      setUpdateTrigger((prev) => prev + 1);
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
-      setUpdateTrigger(prev => prev + 1);
+      setUpdateTrigger((prev) => prev + 1);
     };
 
     const handleError = (err: Error) => setError(err.message);
-    
+
     const handleUpdate = () => {
-      setUpdateTrigger(prev => prev + 1);
+      setUpdateTrigger((prev) => prev + 1);
     };
 
     xmppClient.on("connected", handleConnect);
@@ -40,6 +38,28 @@ export function useXmpp() {
       xmppClient.off("message", handleUpdate);
       xmppClient.off("archivedMessage", handleUpdate);
     };
+  }, []);
+
+  const connect = useCallback(async (email: string, password: string) => {
+    try {
+      return await xmppClient.connect(email, password);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to connect";
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const disconnect = useCallback(async () => {
+    try {
+      return await xmppClient.disconnect();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to disconnect";
+      setError(errorMessage);
+      throw err;
+    }
   }, []);
 
   const getContacts = useCallback(() => {
@@ -86,8 +106,8 @@ export function useXmpp() {
   }, []);
 
   return {
-    // TODO: remove client here to not expose the client
-    client: xmppClient,
+    connect,
+    disconnect,
     isConnected,
     error,
     getContacts,
@@ -99,7 +119,7 @@ export function useXmpp() {
   };
 }
 
-
 // TODO: handle contacts online and update contacts, add status to message
 // TODO: show last message for contact
 // TODO: fix date for new messages
+// TODO: order messages by date
