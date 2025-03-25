@@ -464,6 +464,8 @@ class XMPPClient extends EventEmitter {
           timestamp: new Date().toLocaleDateString(),
         };
 
+        console.log("Send message contactId: ", contact.id);
+
         // Add to messages
         if (!this.messages[contact.id]) {
           this.messages[contact.id] = [];
@@ -473,6 +475,7 @@ class XMPPClient extends EventEmitter {
         this.messages[contact.id]?.push(message);
 
         console.log("message stanza: ", message);
+        console.log("messages afer recieve stanza: ", this.messages);
 
         // Update contact
         contact.lastMessageTime = new Date().toISOString();
@@ -543,17 +546,20 @@ class XMPPClient extends EventEmitter {
       }
       this.messages[contact.id]?.push(messageObj);
 
+      console.log("archived message contactId: ", contact.id);
+      console.log("archivedMessages: ", this.messages);
+
       // Emit (if you want)
       this.emit("archivedMessage", messageObj);
     }
     // Trigger hook to stop collecting archived Messages
-    else if (
+    /*else if (
       stanza.is("iq") &&
       stanza.getChild("fin", "urn:xmpp:mam:2") !== undefined
     ) {
       console.log("✅ MAM finished loading archived messages");
       this.emit("mamFinished");
-    }
+    }*/
 
     // Handle presence stanza
     else if (stanza.is("presence")) {

@@ -14,9 +14,9 @@ export default function ChatInterface() {
     useState<XMPPContact | null>(null);
   const [showConversations, setShowConversations] = useState(true);
   const { user, logout } = useAuth();
-  const { sendMessage, addContact, contacts, messages } = useXmpp();
+  const { sendMessage, addContact, contacts, getMessages } = useXmpp();
 
-  console.log("Messages:", messages);
+  console.log("Messages in chatInterface:", getMessages);
   console.log("activeConversations", activeConversation);
 
   const handleSelectConversation = (conversation: XMPPContact) => {
@@ -82,7 +82,7 @@ export default function ChatInterface() {
           {activeConversation ? (
             <ChatWindow
               conversation={activeConversation}
-              messages={messages[activeConversation.jid] ?? []}
+              messages={getMessages(activeConversation.id) ?? []}
               onSendMessage={handleSendMessage}
               onBack={isMobile ? handleBackToList : undefined}
               onClose={handleCloseChat}

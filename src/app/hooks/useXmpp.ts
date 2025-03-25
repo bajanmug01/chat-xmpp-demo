@@ -9,7 +9,7 @@ export function useXmpp() {
   const [isConnected, setIsConnected] = useState(xmppClient.isConnected());
   const [error, setError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<XMPPContact[]>([]);
-  const [messages, setMessages] = useState<Record<string, XMPPMessage[]>>({});
+  const [messageUpdate, setMessageUpdate] = useState(0);
 
   useEffect(() => {
     // Only initialize state if connected
@@ -17,7 +17,6 @@ export function useXmpp() {
       setContacts(xmppClient.getContacts());
     } else {
       setContacts([]);
-      setMessages({});
     }
 
     const handleConnect = () => {
@@ -28,20 +27,14 @@ export function useXmpp() {
     const handleDisconnect = () => {
       setIsConnected(false);
       setContacts([]);
-      setMessages({});
     };
 
     const handleError = (err: Error) => setError(err.message);
     const handleContactsUpdate = (newContacts: XMPPContact[]) =>
       setContacts(newContacts);
-    const handleMessage = (message: XMPPMessage) => {
-      setMessages((prev) => {
-        const contactMessages = prev[message.from] ?? [];
-        return {
-          ...prev,
-          [message.from]: [...contactMessages, message],
-        };
-      });
+    
+    const handleMessage = () => {
+      setMessageUpdate(prev => prev + 1);
     };
 
     // Subscribe to XMPP client events
@@ -78,13 +71,6 @@ export function useXmpp() {
   const sendMessage = useCallback(async (to: string, body: string) => {
     try {
       const message = await xmppClient.sendMessage(to, body);
-      setMessages((prev) => {
-        const contactMessages = prev[to] ?? [];
-        return {
-          ...prev,
-          [to]: [...contactMessages, message],
-        };
-      });
       return message;
     } catch (err) {
       const errorMessage =
@@ -105,16 +91,19 @@ export function useXmpp() {
     [],
   );
 
+  const getMessages = useCallback((contactId: string) => {
+    return xmppClient.getMessages(contactId);
+  }, []);
+
   return {
     client: xmppClient,
     isConnected,
     error,
     contacts,
-    messages,
+    getMessages,
     addContact,
     sendMessage,
     markAsRead,
     updatePresence,
-    //getMessages: (contactId: string) => xmppClient.getMessages(contactId),
   };
 }
