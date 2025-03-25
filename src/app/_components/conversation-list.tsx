@@ -15,7 +15,6 @@ interface ConversationListProps {
   activeConversationId?: string;
   onSelectConversation: (conversation: XMPPContact) => void;
   onLogout: () => void;
-  onAddContact: (contact: Omit<XMPPContact, "id">) => void;
   currentUser: User;
 }
 
@@ -24,7 +23,6 @@ export default function ConversationList({
   activeConversationId,
   onSelectConversation,
   onLogout,
-  onAddContact,
   currentUser,
 }: ConversationListProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,7 +152,6 @@ export default function ConversationList({
       <AddContactDialog
         open={isAddContactOpen}
         onOpenChange={setIsAddContactOpen}
-        onAddContact={onAddContact}
       />
     </div>
   );

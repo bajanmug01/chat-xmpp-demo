@@ -14,7 +14,7 @@ export default function ChatInterface() {
     useState<XMPPContact | null>(null);
   const [showConversations, setShowConversations] = useState(true);
   const { user, logout } = useAuth();
-  const { sendMessage, addContact, getContacts, getMessages } = useXmpp();
+  const { sendMessage, getContacts, getMessages } = useXmpp();
 
   console.log("Messages in chatInterface:", getMessages);
   console.log("activeConversations", activeConversation);
@@ -47,15 +47,6 @@ export default function ChatInterface() {
     }
   };
 
-  const handleAddContact = async (contactData: Omit<XMPPContact, "id">) => {
-    try {
-      // Add contact to roster with full JID
-      await addContact(contactData.jid);
-    } catch (error) {
-      console.error("Failed to add contact:", error);
-    }
-  };
-
   if (!user) return null;
 
   return (
@@ -70,7 +61,6 @@ export default function ChatInterface() {
             activeConversationId={activeConversation?.id}
             onSelectConversation={handleSelectConversation}
             onLogout={logout}
-            onAddContact={handleAddContact}
             currentUser={user}
           />
         </div>

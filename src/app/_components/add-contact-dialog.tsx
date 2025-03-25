@@ -15,21 +15,18 @@ import { Alert, AlertDescription } from "LA/components/ui/alert";
 import { Label } from "LA/components/ui/label";
 import { Input } from "LA/components/ui/input";
 import { Button } from "LA/components/ui/button";
-import { type XMPPContact } from "../lib/xmppClient";
 import { useXmpp } from "../hooks/useXmpp";
 
 interface AddContactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddContact: (contact: Omit<XMPPContact, "id">) => void;
 }
 
 export function AddContactDialog({
   open,
   onOpenChange,
-  onAddContact,
 }: AddContactDialogProps) {
-  const { client, isConnected } = useXmpp();
+  const { isConnected, addContact } = useXmpp();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,26 +48,14 @@ export function AddContactDialog({
     setIsSubmitting(true);
 
     try {
-      await client.addToRoster(name);
-
-      // Create a new contact
-      const newContact: Omit<XMPPContact, "id"> = {
-        jid: name,
-        name: name.trim(),
-        avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.charAt(0))}`,
-        lastMessageTime: new Date().toISOString(),
-        unreadCount: 0,
-        status: "online",
-      };
-
-      // Add the contact
-      onAddContact(newContact);
+      await addContact(name);
 
       // Reset form and close dialog
       setName("");
       onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to add contact";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to add contact";
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
