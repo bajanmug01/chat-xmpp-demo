@@ -16,7 +16,6 @@ export default function ChatInterface() {
   const { user, logout } = useAuth();
   const { sendMessage, getContacts, getMessages } = useXmpp();
 
-  console.log("Messages in chatInterface:", getMessages);
   console.log("activeConversations", activeConversation);
 
   const handleSelectConversation = (conversation: XMPPContact) => {

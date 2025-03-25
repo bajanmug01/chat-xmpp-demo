@@ -4,7 +4,7 @@ import { xmppClient } from "../lib/xmppClient";
 export function useXmpp() {
   const [isConnected, setIsConnected] = useState(xmppClient.isConnected());
   const [error, setError] = useState<string | null>(null);
-  const [updateTrigger, setUpdateTrigger] = useState(0);
+  const [, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     const handleConnect = () => {
