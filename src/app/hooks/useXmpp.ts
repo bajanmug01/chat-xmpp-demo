@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   xmppClient,
-  type XMPPContact,
 } from "../lib/xmppClient";
 
 export function useXmpp() {
@@ -87,6 +86,7 @@ export function useXmpp() {
   }, []);
 
   return {
+    // TODO: remove client here to not expose the client
     client: xmppClient,
     isConnected,
     error,
@@ -98,3 +98,8 @@ export function useXmpp() {
     updatePresence,
   };
 }
+
+
+// TODO: handle contacts online and update contacts, add status to message
+// TODO: show last message for contact
+// TODO: fix date for new messages
