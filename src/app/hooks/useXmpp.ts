@@ -2,60 +2,51 @@ import { useState, useEffect, useCallback } from "react";
 import {
   xmppClient,
   type XMPPContact,
-  type XMPPMessage,
 } from "../lib/xmppClient";
 
 export function useXmpp() {
   const [isConnected, setIsConnected] = useState(xmppClient.isConnected());
   const [error, setError] = useState<string | null>(null);
-  const [contacts, setContacts] = useState<XMPPContact[]>([]);
-  const [messageUpdate, setMessageUpdate] = useState(0);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
-    // Only initialize state if connected
-    if (xmppClient.isConnected()) {
-      setContacts(xmppClient.getContacts());
-    } else {
-      setContacts([]);
-    }
-
     const handleConnect = () => {
       setIsConnected(true);
-      setContacts(xmppClient.getContacts());
+      setUpdateTrigger(prev => prev + 1);
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
-      setContacts([]);
+      setUpdateTrigger(prev => prev + 1);
     };
 
     const handleError = (err: Error) => setError(err.message);
-    const handleContactsUpdate = (newContacts: XMPPContact[]) =>
-      setContacts(newContacts);
     
-    const handleMessage = () => {
-      setMessageUpdate(prev => prev + 1);
+    const handleUpdate = () => {
+      setUpdateTrigger(prev => prev + 1);
     };
 
-    // Subscribe to XMPP client events
     xmppClient.on("connected", handleConnect);
     xmppClient.on("disconnected", handleDisconnect);
     xmppClient.on("error", handleError);
-    xmppClient.on("contactsUpdated", handleContactsUpdate);
-    xmppClient.on("message", handleMessage);
-    xmppClient.on("archivedMessage", handleMessage);
+    xmppClient.on("contactsUpdated", handleUpdate);
+    xmppClient.on("message", handleUpdate);
+    xmppClient.on("archivedMessage", handleUpdate);
 
     return () => {
       xmppClient.off("connected", handleConnect);
       xmppClient.off("disconnected", handleDisconnect);
       xmppClient.off("error", handleError);
-      xmppClient.off("contactsUpdated", handleContactsUpdate);
-      xmppClient.off("message", handleMessage);
-      xmppClient.off("archivedMessage", handleMessage);
+      xmppClient.off("contactsUpdated", handleUpdate);
+      xmppClient.off("message", handleUpdate);
+      xmppClient.off("archivedMessage", handleUpdate);
     };
   }, []);
 
-  // Wrap XMPP client methods in useCallback to maintain reference stability
+  const getContacts = useCallback(() => {
+    return xmppClient.getContacts();
+  }, []);
+
   const addContact = useCallback(async (jid: string) => {
     try {
       const result = await xmppClient.addToRoster(jid);
@@ -99,7 +90,7 @@ export function useXmpp() {
     client: xmppClient,
     isConnected,
     error,
-    contacts,
+    getContacts,
     getMessages,
     addContact,
     sendMessage,

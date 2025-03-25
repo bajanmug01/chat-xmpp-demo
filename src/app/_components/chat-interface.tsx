@@ -14,7 +14,7 @@ export default function ChatInterface() {
     useState<XMPPContact | null>(null);
   const [showConversations, setShowConversations] = useState(true);
   const { user, logout } = useAuth();
-  const { sendMessage, addContact, contacts, getMessages } = useXmpp();
+  const { sendMessage, addContact, getContacts, getMessages } = useXmpp();
 
   console.log("Messages in chatInterface:", getMessages);
   console.log("activeConversations", activeConversation);
@@ -66,7 +66,7 @@ export default function ChatInterface() {
           className={`${isMobile ? "w-full" : "w-1/3 border-r"} dark:border-gray-800`}
         >
           <ConversationList
-            conversations={contacts}
+            conversations={getContacts()}
             activeConversationId={activeConversation?.id}
             onSelectConversation={handleSelectConversation}
             onLogout={logout}
