@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { api } from "LA/trpc/react";
 import { useXmpp } from "../hooks/useXmpp";
+import { env } from "LA/env";
 
 export type User = {
   id: string;
@@ -35,10 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Connect to XMPP server with credentials
       const success = await client.connect(email, password);
 
+      const username = email.split("@")[0] ?? email;
+
       if (success) {
         const newUser = {
           id: email,
-          name: email.split("@")[0] ?? email,
+          name: `${username}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`,
           email,
           avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(email.charAt(0).toUpperCase())}`,
         };
