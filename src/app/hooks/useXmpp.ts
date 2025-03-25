@@ -24,7 +24,7 @@ export function useXmpp() {
       setIsConnected(true);
       setContacts(xmppClient.getContacts());
     };
-    
+
     const handleDisconnect = () => {
       setIsConnected(false);
       setContacts([]);
@@ -50,6 +50,7 @@ export function useXmpp() {
     xmppClient.on("error", handleError);
     xmppClient.on("contactsUpdated", handleContactsUpdate);
     xmppClient.on("message", handleMessage);
+    xmppClient.on("archivedMessage", handleMessage);
 
     return () => {
       xmppClient.off("connected", handleConnect);
@@ -57,6 +58,7 @@ export function useXmpp() {
       xmppClient.off("error", handleError);
       xmppClient.off("contactsUpdated", handleContactsUpdate);
       xmppClient.off("message", handleMessage);
+      xmppClient.off("archivedMessage", handleMessage);
     };
   }, []);
 

@@ -16,6 +16,10 @@ export default function MessageBubble({
 
   console.log("user name: ", user.user?.name);
 
+  // TODO: status for message
+  // TODO: load old messages 
+  // TODO: unread messegas mark as read
+
   return (
     <div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
       <div

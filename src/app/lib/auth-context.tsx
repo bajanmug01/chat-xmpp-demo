@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar: `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(email.charAt(0).toUpperCase())}`,
         };
         setUser(newUser);
+
         return true;
       }
       return false;

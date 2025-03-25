@@ -5,11 +5,9 @@ admins = { "alice@localhost" }
 
 use_libevent = true
 modules_enabled = {
-    -- Required modules
     "roster"; "saslauth"; "tls"; "dialback";
     "disco"; "posix"; "private"; "vcard";
     
-    -- Nice to have
     "version"; "uptime"; "time"; "ping";
     "register"; "admin_adhoc";
     

@@ -12,7 +12,6 @@ export type XMPPMessage = {
   to: string;
   body: string;
   timestamp: string;
-  encrypted?: boolean;
   //status: "read" | "unread";
 };
 
@@ -54,6 +53,7 @@ class XMPPClient extends EventEmitter {
   public async connect(jid: string, password: string): Promise<boolean> {
     try {
       const username = jid.includes("@") ? jid.split("@")[0] : jid;
+      const fullJid = `${username}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`; // since users can have other emails addresses than local domain (not a good implementation but ok for demo)
       // Create XMPP client with environment variables
       console.log("username: ", username);
       console.log("password: ", password);
@@ -84,7 +84,7 @@ class XMPPClient extends EventEmitter {
         console.log("data: ", data);
         console.log("Connected as", username);
         this.connected = true;
-        this.currentUser = username!;
+        this.currentUser = fullJid;
         console.log("currentUser: ", this.currentUser);
       });
 
@@ -118,8 +118,8 @@ class XMPPClient extends EventEmitter {
       // Wait for connection
       await Promise.race([connectionPromise, timeoutPromise]);
 
-      // Now that we're connected, send presence and request roster
       await this.xmppClient.send(xml("presence"));
+
       await this.xmppClient.send(
         xml(
           "iq",
@@ -130,6 +130,8 @@ class XMPPClient extends EventEmitter {
 
       // Wait for roster to be received
       await rosterPromise;
+
+      await this.fetchArchivedMessages();
 
       // Emit connected event after roster is loaded
       this.emit("connected", { jid });
@@ -164,13 +166,13 @@ class XMPPClient extends EventEmitter {
 
       // Stop the client
       await this.xmppClient.stop();
-      
+
       // Clear all state
       this.connected = false;
       this.currentUser = null;
-      this.contacts = [];  // Clear contacts
-      this.messages = {};  // Clear messages
-      
+      this.contacts = []; // Clear contacts
+      this.messages = {}; // Clear messages
+
       // Emit events to update UI
       this.emit("contactsUpdated", []);
     }
@@ -205,8 +207,12 @@ class XMPPClient extends EventEmitter {
       throw new Error("Cannot send message: not connected");
     }
 
-    //const contactId = "alice";
-    const contactId = this.contacts.find((c) => c.jid === to)?.id;
+    // Ensure 'to' has the domain if needed
+    const fullTo = to.includes("@")
+      ? to
+      : `${to}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`;
+
+    const contactId = this.contacts.find((c) => c.jid === fullTo)?.id;
     if (!contactId) {
       throw new Error("Cannot send message: contact not found");
     }
@@ -215,10 +221,12 @@ class XMPPClient extends EventEmitter {
 
     const messageId = Math.random().toString(36).substring(2, 15);
 
+    console.log("send message to: ", fullTo);
+
     // Send message via XMPP
     const messageElement = xml(
       "message",
-      { type: "chat", to, id: messageId },
+      { type: "chat", to: fullTo, id: messageId },
       xml("body", {}, processedBody),
     );
 
@@ -226,11 +234,13 @@ class XMPPClient extends EventEmitter {
       await this.xmppClient.send(messageElement);
     }
 
+    console.log("currentuserxx: ", this.currentUser);
+
     // Create message object for local storage
     const messageObj: XMPPMessage = {
       id: messageId,
       from: this.currentUser,
-      to,
+      to: fullTo,
       body: processedBody,
       timestamp: new Date().toLocaleDateString(),
     };
@@ -324,6 +334,87 @@ class XMPPClient extends EventEmitter {
       void this.xmppClient.send(presenceElement);
     }
   }
+  /**
+   * Add a contact to the roster
+   */
+  public async addToRoster(
+    jid: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.connected || !this.xmppClient) {
+      throw new Error("Cannot add contact: not connected");
+    }
+
+    // Normalize the JID format
+    const username = jid.includes("@") ? jid.split("@")[0] : jid;
+    const fullJid = jid.includes("@")
+      ? jid
+      : `${username}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`;
+
+    console.log("add username: ", username);
+
+    try {
+      // TODO: Check if user exists
+      /*
+        // Send a message and wait a few seconds for error
+  await xmppClient.send(xml("message", { to: domainJid, type: "chat" }, xml("body", {}, "ping")));
+  
+  // Wait and listen for error stanza
+  client.on("stanza", stanza => {
+    if (stanza.is("message") && stanza.attrs.type === "error") {
+      console.log("Probably doesn't exist!");
+    }
+  });
+        */
+
+      // Send roster set IQ stanza
+      const rosterSetId = `roster_set_${Math.random().toString(36).substring(2, 15)}`;
+
+      await this.xmppClient.send(
+        xml(
+          "iq",
+          { type: "set", id: rosterSetId },
+          xml(
+            "query",
+            { xmlns: "jabber:iq:roster" },
+            xml("item", { jid: fullJid, name: username! }),
+          ),
+        ),
+      );
+
+      // Send subscription request
+      await this.xmppClient.send(
+        xml("presence", { to: fullJid, type: "subscribe" }),
+      );
+
+      // Create a local contact if it doesn't exist yet
+      const existingContact = this.contacts.find((c) => c.jid === fullJid);
+      if (!existingContact) {
+        const contactId = Math.random().toString(36).substring(2, 15);
+        const displayName = username!;
+
+        const contact: XMPPContact = {
+          id: contactId,
+          jid: fullJid,
+          name: displayName,
+          status: "offline", // Default to offline until we receive presence
+          unreadCount: 0,
+          lastMessageTime: new Date().toISOString(),
+        };
+
+        this.contacts.push(contact);
+        this.emit("contactsUpdated", this.contacts);
+      }
+      console.log("added contact to roster: ", Contact.name);
+
+      return { success: true };
+    } catch (error) {
+      console.error(
+        "Error adding contact to roster:",
+        error instanceof Error ? error.message : error,
+      );
+      return { success: false, error: "Error adding contact" };
+    }
+  }
 
   /**
    * Handle incoming XMPP stanza
@@ -342,16 +433,15 @@ class XMPPClient extends EventEmitter {
         //   stanza.getChild("encrypted", "urn:xmpp:e2e:0") !== undefined;
 
         // Extract bare JID and local part
-        const bareJid = from.split("/")[0];
+        const bareJid = from.split("/")[0]; // This keeps the domain part
         if (!bareJid) return;
-
-        const localPart = bareJid.split("@")[0] ?? bareJid;
 
         // Find or create contact
         let contact = this.contacts.find((c) => c.jid === bareJid);
         if (!contact) {
           // Create new contact
           const contactId = Math.random().toString(36).substring(2, 15);
+          const localPart = bareJid.split("@")[0] ?? bareJid;
 
           contact = {
             id: contactId,
@@ -382,6 +472,8 @@ class XMPPClient extends EventEmitter {
         // Now we know this.messages[contact.id] exists
         this.messages[contact.id]?.push(message);
 
+        console.log("message stanza: ", message);
+
         // Update contact
         contact.lastMessageTime = new Date().toISOString();
         contact.unreadCount += 1;
@@ -389,13 +481,85 @@ class XMPPClient extends EventEmitter {
         // Emit message event
         this.emit("message", message);
       }
+      // Handle archived message stanza
+    } else if (
+      stanza.is("message") &&
+      stanza.getChild("result", "urn:xmpp:mam:2") !== undefined
+    ) {
+      const result = stanza.getChild("result", "urn:xmpp:mam:2");
+      const forwarded = result?.getChild("forwarded", "urn:xmpp:forward:0");
+      const message = forwarded?.getChild("message");
+      const delay = forwarded?.getChild("delay", "urn:xmpp:delay");
+
+      const from = message?.attrs.from;
+      const to = message?.attrs.to;
+      const body = message?.getChildText("body");
+      const timestamp = delay?.attrs.stamp ?? new Date().toISOString();
+
+      if (!from || !to || !body) return;
+
+      // Keep the full JID including domain
+      const fromBareJid = from.split("/")[0];
+      const toBareJid = to.split("/")[0];
+      if (!fromBareJid || !toBareJid) return;
+
+      const currentUserBareJid = this.currentUser;
+
+      const isFromMe = fromBareJid === currentUserBareJid;
+
+      const peerBareJid = isFromMe ? toBareJid : fromBareJid;
+
+      let contact = this.contacts.find((c) => c.jid === peerBareJid);
+      if (!contact) {
+        const localPart = peerBareJid.split("@")[0] ?? peerBareJid;
+        const contactId = Math.random().toString(36).substring(2, 15);
+
+        contact = {
+          id: contactId,
+          jid: peerBareJid,
+          name: localPart,
+          status: "online",
+          unreadCount: 0,
+          lastMessageTime: timestamp,
+        };
+        this.contacts.push(contact);
+      }
+
+      console.log("fromBareJid", fromBareJid);
+      console.log("toBareJid", toBareJid);
+
+      // Build the message
+      const messageObj: XMPPMessage = {
+        id: message?.attrs.id ?? Math.random().toString(36).substring(2, 15),
+        from: fromBareJid,
+        to: toBareJid,
+        body,
+        timestamp,
+      };
+
+      // Store it in messages under contact.id
+      if (!this.messages[contact.id]) {
+        this.messages[contact.id] = [];
+      }
+      this.messages[contact.id]?.push(messageObj);
+
+      // Emit (if you want)
+      this.emit("archivedMessage", messageObj);
+    }
+    // Trigger hook to stop collecting archived Messages
+    else if (
+      stanza.is("iq") &&
+      stanza.getChild("fin", "urn:xmpp:mam:2") !== undefined
+    ) {
+      console.log("✅ MAM finished loading archived messages");
+      this.emit("mamFinished");
     }
 
     // Handle presence stanza
     else if (stanza.is("presence")) {
       const from = stanza.attrs.from;
       if (from && from !== this.currentUser) {
-        const bareJid = from.split("/")[0];
+        const bareJid = from.split("/")[0]; // Keep domain part
         if (!bareJid) return;
 
         // Determine status
@@ -433,6 +597,8 @@ class XMPPClient extends EventEmitter {
       if (query) {
         const items = query.getChildren("item");
 
+        console.log("rosteritems: ", items);
+
         if (items && items.length > 0) {
           for (const item of items) {
             const itemJid = item.attrs.jid;
@@ -442,7 +608,7 @@ class XMPPClient extends EventEmitter {
 
             // Check if contact already exists
             const existingContact = this.contacts.find(
-              (c) => c.jid === itemJid,
+              (c) => c.jid === itemJid, // itemJid already has the domain
             );
             if (!existingContact) {
               // Create new contact
@@ -461,6 +627,8 @@ class XMPPClient extends EventEmitter {
             }
           }
 
+          console.log("Stanza Contacts: ", this.contacts);
+
           // Emit contacts updated event
           this.emit("contactsUpdated", this.contacts);
         }
@@ -468,82 +636,32 @@ class XMPPClient extends EventEmitter {
     }
   }
 
-  /**
-   * Add a contact to the roster
-   */
-  public async addToRoster(
-    jid: string,
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!this.connected || !this.xmppClient) {
-      throw new Error("Cannot add contact: not connected");
-    }
+  private async fetchArchivedMessages(): Promise<void> {
+    if (!this.xmppClient) return;
 
-    const username = jid.includes("@") ? jid.split("@")[0] : jid;
-    const domainJid = `${username}@${env.NEXT_PUBLIC_XMPP_DOMAIN}`;
-
-    console.log("add username: ", username);
-
-    try {
-      // TODO: Check if user exists
-      /*
-      // Send a message and wait a few seconds for error
-await xmppClient.send(xml("message", { to: domainJid, type: "chat" }, xml("body", {}, "ping")));
-
-// Wait and listen for error stanza
-client.on("stanza", stanza => {
-  if (stanza.is("message") && stanza.attrs.type === "error") {
-    console.log("Probably doesn't exist!");
-  }
-});
-      */
-
-      // Send roster set IQ stanza
-      const rosterSetId = `roster_set_${Math.random().toString(36).substring(2, 15)}`;
-
-      await this.xmppClient.send(
+    const mamQuery = xml(
+      "iq",
+      { type: "set", id: "mam1" },
+      xml(
+        "query",
+        { xmlns: "urn:xmpp:mam:2" },
         xml(
-          "iq",
-          { type: "set", id: rosterSetId },
+          "x",
+          { xmlns: "jabber:x:data", type: "submit" },
           xml(
-            "query",
-            { xmlns: "jabber:iq:roster" },
-            xml("item", { jid: domainJid, name: username! }),
+            "field",
+            { var: "FORM_TYPE", type: "hidden" },
+            xml("value", {}, "urn:xmpp:mam:2"),
           ),
         ),
-      );
+      ),
+    );
 
-      // Send subscription request
-      await this.xmppClient.send(
-        xml("presence", { to: domainJid, type: "subscribe" }),
-      );
-
-      // Create a local contact if it doesn't exist yet
-      const existingContact = this.contacts.find((c) => c.jid === domainJid);
-      if (!existingContact) {
-        const contactId = Math.random().toString(36).substring(2, 15);
-        const displayName = username!;
-
-        const contact: XMPPContact = {
-          id: contactId,
-          jid,
-          name: displayName,
-          status: "offline", // Default to offline until we receive presence
-          unreadCount: 0,
-          lastMessageTime: new Date().toISOString(),
-        };
-
-        this.contacts.push(contact);
-        this.emit("contactsUpdated", this.contacts);
-      }
-      console.log("added contact to roster: ", Contact.name);
-
-      return { success: true };
-    } catch (error) {
-      console.error(
-        "Error adding contact to roster:",
-        error instanceof Error ? error.message : error,
-      );
-      return { success: false, error: "Error adding contact" };
+    try {
+      await this.xmppClient.send(mamQuery);
+      console.log("MAM query sent");
+    } catch (err) {
+      console.error("Error sending MAM query:", err);
     }
   }
 }
